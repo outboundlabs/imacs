@@ -1,0 +1,41 @@
+# Drift Status Spec
+# Classifies overall drift status from comparison results
+#
+# DOGFOODING: Used by drift.rs to determine DriftStatus
+
+id: drift_status
+name: "Drift Status Classification"
+
+inputs:
+  - name: error_count
+    type: int
+  - name: warning_count
+    type: int
+  - name: comparable
+    type: bool
+    description: "Were the two files comparable at all?"
+
+outputs:
+  - name: status
+    type: !enum [Synced, MinorDrift, MajorDrift, Incomparable]
+
+rules:
+  # Not comparable (no matching functions, different structure)
+  - id: incomparable
+    when: "!comparable"
+    then: "Incomparable"
+
+  # Has errors = major drift
+  - id: major
+    when: "comparable && error_count > 0"
+    then: "MajorDrift"
+
+  # Only warnings = minor drift
+  - id: minor
+    when: "comparable && error_count == 0 && warning_count > 0"
+    then: "MinorDrift"
+
+  # No issues = synced
+  - id: synced
+    when: "comparable && error_count == 0 && warning_count == 0"
+    then: "Synced"

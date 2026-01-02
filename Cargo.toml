@@ -1,0 +1,61 @@
+[package]
+name = "imacs"
+version = "0.1.0"
+edition = "2021"
+authors = ["IMACS Contributors"]
+description = "Intelligent Model-Assisted Code Synthesis - Spec-driven code verification, generation, and testing"
+license = "MIT"
+repository = "https://github.com/imacs-dev/imacs"
+keywords = ["verification", "code-generation", "testing", "specifications", "decision-tables"]
+categories = ["development-tools", "development-tools::testing"]
+readme = "README.md"
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+
+# Parsing
+tree-sitter = "0.20"
+tree-sitter-rust = "0.20"
+tree-sitter-typescript = "0.20"
+tree-sitter-python = "0.20"
+tree-sitter-go = "0.20"
+tree-sitter-java = "0.20"
+tree-sitter-c-sharp = "0.20"
+cel-parser = "0.6"
+cel-interpreter = "0.10"
+
+# Utilities
+thiserror = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+
+# Code generation
+genco = "0.17"
+
+# Code formatting
+prettyplease = "0.2"
+syn = { version = "2.0", features = ["full", "parsing"] }
+
+# JSON Schema
+schemars = "0.8"
+
+# Completeness analysis (Phase 5)
+quine-mc_cluskey = "0.2"  # Pure Rust Quine-McCluskey implementation
+
+[dev-dependencies]
+proptest = "1.0"
+pretty_assertions = "1.4"
+
+[features]
+default = []
+typescript = []  # Future: tree-sitter-typescript
+python = []      # Future: tree-sitter-python
+
+[[bin]]
+name = "imacs"
+path = "src/main.rs"

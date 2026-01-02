@@ -1,0 +1,38 @@
+# Null Literal Mapping Spec
+# Maps null/none to target language syntax
+
+id: null_literal
+name: "Null Literal Rendering"
+
+inputs:
+  - name: target
+    type: !enum [Rust, TypeScript, Python, CSharp, Java, Go]
+
+outputs:
+  - name: literal
+    type: string
+
+rules:
+  - id: null_rust
+    when: "target == 'Rust'"
+    then: "None"
+
+  - id: null_ts
+    when: "target == 'TypeScript'"
+    then: "null"
+
+  - id: null_py
+    when: "target == 'Python'"
+    then: "None"
+
+  - id: null_csharp
+    when: "target == 'CSharp'"
+    then: "null"
+
+  - id: null_java
+    when: "target == 'Java'"
+    then: "null"
+
+  - id: null_go
+    when: "target == 'Go'"
+    then: "nil"

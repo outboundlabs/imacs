@@ -1,0 +1,63 @@
+# Gap Classification Spec
+# Classifies verification gaps by type and severity
+#
+# DOGFOODING: Used by verify.rs to classify why code doesn't match spec
+
+id: gap_classification
+name: "Verification Gap Classification"
+
+inputs:
+  - name: rule_found
+    type: bool
+    description: "Was a matching rule structure found in code?"
+  - name: condition_matches
+    type: bool
+    description: "Does the condition logic match?"
+  - name: output_matches
+    type: bool
+    description: "Does the output value match?"
+  - name: priority_correct
+    type: bool
+    description: "Is the rule in the correct priority order?"
+
+outputs:
+  - name: gap_reason
+    type: !enum [Missing, ConditionMismatch, OutputMismatch, WrongPriority, None]
+  - name: severity
+    type: !enum [Error, Warning, None]
+
+rules:
+  # Perfect match - no gap
+  - id: no_gap
+    when: "rule_found && condition_matches && output_matches"
+    then:
+      gap_reason: "None"
+      severity: "None"
+
+  # Rule not found at all
+  - id: missing
+    when: "!rule_found"
+    then:
+      gap_reason: "Missing"
+      severity: "Error"
+
+  # Found but condition wrong
+  - id: condition
+    when: "rule_found && !condition_matches"
+    then:
+      gap_reason: "ConditionMismatch"
+      severity: "Error"
+
+  # Found, condition ok, output wrong
+  - id: output
+    when: "rule_found && condition_matches && !output_matches"
+    then:
+      gap_reason: "OutputMismatch"
+      severity: "Error"
+
+  # All correct but priority wrong
+  - id: priority
+    when: "rule_found && condition_matches && output_matches && !priority_correct"
+    then:
+      gap_reason: "WrongPriority"
+      severity: "Warning"

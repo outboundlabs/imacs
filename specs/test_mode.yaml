@@ -1,0 +1,53 @@
+# Test Mode Selection Spec
+# Determines which test types to generate based on spec characteristics
+#
+# DOGFOODING: Used by testgen.rs to decide test strategy
+
+id: test_mode_selection
+name: "Test Generation Mode Selection"
+
+inputs:
+  - name: input_count
+    type: int
+  - name: all_inputs_enumerable
+    type: bool
+    description: "Are all inputs bool or small enum?"
+  - name: has_numeric_conditions
+    type: bool
+    description: "Does spec have >, <, >=, <= conditions?"
+  - name: total_combinations
+    type: int
+    description: "Product of all input cardinalities"
+
+outputs:
+  - name: generate_exhaustive
+    type: bool
+  - name: generate_boundary
+    type: bool
+  - name: generate_property
+    type: bool
+
+rules:
+  # Few enumerable inputs: generate exhaustive
+  - id: exhaustive_yes
+    when: "all_inputs_enumerable && total_combinations <= 64"
+    then:
+      generate_exhaustive: true
+      generate_boundary: false
+      generate_property: true
+
+  # Too many combinations: skip exhaustive
+  - id: exhaustive_no
+    when: "!all_inputs_enumerable || total_combinations > 64"
+    then:
+      generate_exhaustive: false
+      generate_boundary: true
+      generate_property: true
+
+  # Has numeric conditions: always do boundary
+  - id: boundary_numeric
+    when: "has_numeric_conditions"
+    then:
+      generate_exhaustive: false
+      generate_boundary: true
+      generate_property: true

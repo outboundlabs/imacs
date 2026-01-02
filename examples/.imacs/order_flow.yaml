@@ -1,0 +1,51 @@
+id: order_flow
+name: "Order Processing Flow"
+description: "Simple orchestrator demonstrating Call and Gate steps"
+
+uses:
+  - access_level
+  - shipping_rate
+
+inputs:
+  - name: role
+    type: string
+  - name: verified
+    type: bool
+  - name: weight_kg
+    type: float
+  - name: zone
+    type: string
+  - name: priority
+    type: bool
+  - name: member_tier
+    type: string
+
+outputs:
+  - name: can_order
+    type: bool
+  - name: shipping_cost
+    type: float
+
+chain:
+  # Step 1: Check user access level
+  - step: call
+    id: check_access
+    spec: access_level
+    inputs:
+      role: "role"
+      verified: "verified"
+
+  # Step 2: Gate - require level >= 50 to proceed
+  - step: gate
+    id: require_access
+    condition: "check_access.level >= 50"
+
+  # Step 3: Calculate shipping rate
+  - step: call
+    id: calc_shipping
+    spec: shipping_rate
+    inputs:
+      weight_kg: "weight_kg"
+      zone: "zone"
+      priority: "priority"
+      member_tier: "member_tier"
