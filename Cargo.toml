@@ -46,7 +46,7 @@ prettyplease = "0.2"
 syn = { version = "2.0", features = ["full", "parsing"] }
 
 # JSON Schema
-schemars = "0.8"
+schemars = "1.2"
 
 # Completeness analysis (Phase 5)
 quine-mc_cluskey = "0.2"  # Pure Rust Quine-McCluskey implementation
