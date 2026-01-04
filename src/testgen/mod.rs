@@ -6,23 +6,23 @@
 //! - Boundary tests (edge cases for numeric conditions)
 //! - Property tests (fuzzing)
 
+mod csharp;
+mod go;
+mod java;
+mod python;
 mod rust;
 mod typescript;
-mod python;
-mod csharp;
-mod java;
-mod go;
 
 use crate::cel::Target;
 use crate::spec::*;
 
 // Re-export language modules
+pub use csharp::generate as generate_csharp;
+pub use go::generate as generate_go;
+pub use java::generate as generate_java;
+pub use python::generate as generate_python;
 pub use rust::generate as generate_rust;
 pub use typescript::generate as generate_typescript;
-pub use python::generate as generate_python;
-pub use csharp::generate as generate_csharp;
-pub use java::generate as generate_java;
-pub use go::generate as generate_go;
 
 /// Generate tests from spec
 pub fn generate_tests(spec: &Spec, target: Target) -> String {

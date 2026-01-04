@@ -141,7 +141,7 @@ impl<'a> GoOrchRenderer<'a> {
                 }
             }
             ChainStep::Emit(emit) => {
-                let data = go_expr(&emit.data);
+                let _data = go_expr(&emit.data);
                 quote! {
                     // Emit event: $(&emit.event)
                     // emitter.Emit($(quoted(&emit.event)), $data)
@@ -150,7 +150,7 @@ impl<'a> GoOrchRenderer<'a> {
         }
     }
 
-    fn render_call(&self, call: &CallStep, orch_name: &str) -> go::Tokens {
+    fn render_call(&self, call: &CallStep, _orch_name: &str) -> go::Tokens {
         let spec_pascal = to_pascal(&call.spec);
         let call_id = &call.id;
         let call_id_pascal = to_pascal(call_id);

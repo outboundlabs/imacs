@@ -5,12 +5,12 @@
 //! 2. Integration tests for the orchestrator flow
 //! 3. Contract tests between specs
 
+mod csharp;
+mod go;
+mod java;
+mod python;
 mod rust;
 mod typescript;
-mod python;
-mod csharp;
-mod java;
-mod go;
 
 use crate::cel::Target;
 use crate::orchestrate::*;
@@ -105,7 +105,7 @@ pub(crate) fn find_connections(steps: &[ChainStep]) -> Vec<(String, String, Stri
     for step in steps {
         if let ChainStep::Call(call) = step {
             if let Some(ref prev) = previous_spec {
-                for (_, expr) in &call.inputs {
+                for expr in call.inputs.values() {
                     if expr.starts_with(prev) || expr.contains(&format!("{}.", prev)) {
                         connections.push((prev.clone(), call.spec.clone(), expr.clone()));
                     }
@@ -148,7 +148,9 @@ pub fn verify_orchestrator(
         let code = match implementations.get(&spec_id) {
             Some(c) => c,
             None => {
-                result.errors.push(format!("Missing implementation: {}", spec_id));
+                result
+                    .errors
+                    .push(format!("Missing implementation: {}", spec_id));
                 result.all_passed = false;
                 continue;
             }
@@ -158,7 +160,9 @@ pub fn verify_orchestrator(
             Target::Rust => match crate::parse::parse_rust(code) {
                 Ok(ast) => ast,
                 Err(e) => {
-                    result.errors.push(format!("Parse error for {}: {}", spec_id, e));
+                    result
+                        .errors
+                        .push(format!("Parse error for {}: {}", spec_id, e));
                     result.all_passed = false;
                     continue;
                 }
@@ -175,7 +179,7 @@ pub fn verify_orchestrator(
 
     let validation_errors = orch.validate(specs);
     for error in validation_errors {
-        result.errors.push(format!("{}", error));
+        result.errors.push(error.to_string());
         result.all_passed = false;
     }
 
@@ -193,7 +197,10 @@ pub struct OrchestratorVerification {
 impl OrchestratorVerification {
     pub fn to_report(&self) -> String {
         let mut report = String::new();
-        report.push_str(&format!("# Orchestrator Verification: {}\n\n", self.orchestrator_id));
+        report.push_str(&format!(
+            "# Orchestrator Verification: {}\n\n",
+            self.orchestrator_id
+        ));
 
         if self.all_passed {
             report.push_str("ALL CHECKS PASSED\n\n");
@@ -206,7 +213,10 @@ impl OrchestratorVerification {
 
         for (spec_id, result) in &self.spec_results {
             let status = if result.passed { "PASS" } else { "FAIL" };
-            report.push_str(&format!("| {} | {} | {:.0}% |\n", spec_id, status, result.coverage.percentage));
+            report.push_str(&format!(
+                "| {} | {} | {:.0}% |\n",
+                spec_id, status, result.coverage.percentage
+            ));
         }
 
         if !self.errors.is_empty() {
@@ -226,7 +236,8 @@ mod tests {
 
     #[test]
     fn test_generate_integration_tests() {
-        let orch = Orchestrator::from_yaml(r#"
+        let orch = Orchestrator::from_yaml(
+            r#"
 id: test_flow
 inputs:
   - name: value
@@ -245,7 +256,9 @@ chain:
   - step: gate
     id: check
     condition: "first.result > 0"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let specs = HashMap::new();
         let tests = generate_integration_tests(&orch, &specs, Target::Rust);

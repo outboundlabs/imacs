@@ -96,8 +96,8 @@ fn cmd_verify(args: &[String]) -> Result<()> {
     let spec_path = &args[0];
     let code_path = &args[1];
 
-    let spec_content = fs::read_to_string(spec_path).map_err(|e| Error::Io(e))?;
-    let code_content = fs::read_to_string(code_path).map_err(|e| Error::Io(e))?;
+    let spec_content = fs::read_to_string(spec_path).map_err(Error::Io)?;
+    let code_content = fs::read_to_string(code_path).map_err(Error::Io)?;
 
     let spec = Spec::from_yaml(&spec_content)?;
     let code = parse_rust(&code_content)?;
@@ -122,7 +122,7 @@ fn cmd_render(args: &[String]) -> Result<()> {
     let target = parse_target_arg(args);
     let output = parse_output_arg(args);
 
-    let spec_content = fs::read_to_string(spec_path).map_err(|e| Error::Io(e))?;
+    let spec_content = fs::read_to_string(spec_path).map_err(Error::Io)?;
 
     // Check if this is an orchestrator (has 'chain:' key) or a regular spec
     let code = if spec_content.contains("\nchain:") || spec_content.contains("\nuses:") {
@@ -149,7 +149,7 @@ fn cmd_test(args: &[String]) -> Result<()> {
     let target = parse_target_arg(args);
     let output = parse_output_arg(args);
 
-    let spec_content = fs::read_to_string(spec_path).map_err(|e| Error::Io(e))?;
+    let spec_content = fs::read_to_string(spec_path).map_err(Error::Io)?;
     let spec = Spec::from_yaml(&spec_content)?;
 
     let tests = generate_tests(&spec, target);
@@ -166,7 +166,7 @@ fn cmd_analyze(args: &[String]) -> Result<()> {
     let code_path = &args[0];
     let json_output = args.contains(&"--json".to_string());
 
-    let code_content = fs::read_to_string(code_path).map_err(|e| Error::Io(e))?;
+    let code_content = fs::read_to_string(code_path).map_err(Error::Io)?;
     let code = parse_rust(&code_content)?;
 
     let report = analyze(&code);
@@ -188,7 +188,7 @@ fn cmd_extract(args: &[String]) -> Result<()> {
     let code_path = &args[0];
     let output = parse_output_arg(args);
 
-    let code_content = fs::read_to_string(code_path).map_err(|e| Error::Io(e))?;
+    let code_content = fs::read_to_string(code_path).map_err(Error::Io)?;
     let code = parse_rust(&code_content)?;
 
     let extracted = extract(&code);
@@ -206,8 +206,8 @@ fn cmd_drift(args: &[String]) -> Result<()> {
     let path_b = &args[1];
     let json_output = args.contains(&"--json".to_string());
 
-    let content_a = fs::read_to_string(path_a).map_err(|e| Error::Io(e))?;
-    let content_b = fs::read_to_string(path_b).map_err(|e| Error::Io(e))?;
+    let content_a = fs::read_to_string(path_a).map_err(Error::Io)?;
+    let content_b = fs::read_to_string(path_b).map_err(Error::Io)?;
 
     let code_a = parse_rust(&content_a)?;
     let code_b = parse_rust(&content_b)?;
@@ -260,7 +260,7 @@ fn parse_output_arg(args: &[String]) -> Option<PathBuf> {
 fn write_output(path: &Option<PathBuf>, content: &str) -> Result<()> {
     match path {
         Some(p) => {
-            fs::write(p, content).map_err(|e| Error::Io(e))?;
+            fs::write(p, content).map_err(Error::Io)?;
             eprintln!("Written to: {}", p.display());
         }
         None => {
@@ -279,17 +279,21 @@ fn cmd_regen() -> Result<()> {
     }
 
     // Ensure generated directory exists
-    fs::create_dir_all(&generated_dir).map_err(|e| Error::Io(e))?;
+    fs::create_dir_all(&generated_dir).map_err(Error::Io)?;
 
     let mut modules = Vec::new();
 
     // Process each spec file
-    for entry in fs::read_dir(&specs_dir).map_err(|e| Error::Io(e))? {
-        let entry = entry.map_err(|e| Error::Io(e))?;
+    for entry in fs::read_dir(&specs_dir).map_err(Error::Io)? {
+        let entry = entry.map_err(Error::Io)?;
         let path = entry.path();
 
-        if path.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
-            let spec_content = fs::read_to_string(&path).map_err(|e| Error::Io(e))?;
+        if path
+            .extension()
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false)
+        {
+            let spec_content = fs::read_to_string(&path).map_err(Error::Io)?;
             let spec = Spec::from_yaml(&spec_content)?;
 
             // Generate Rust code
@@ -299,12 +303,15 @@ fn cmd_regen() -> Result<()> {
             let tests = generate_tests(&spec, Target::Rust);
 
             // Combine code and tests
-            let full_code = format!("{}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n\n{}\n}}\n", code, tests);
+            let full_code = format!(
+                "{}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n\n{}\n}}\n",
+                code, tests
+            );
 
             // Write to generated file
             let output_name = format!("{}.rs", spec.id);
             let output_path = generated_dir.join(&output_name);
-            fs::write(&output_path, &full_code).map_err(|e| Error::Io(e))?;
+            fs::write(&output_path, &full_code).map_err(Error::Io)?;
 
             println!("✓ Generated: {}", output_path.display());
             modules.push(spec.id.clone());
@@ -318,7 +325,7 @@ fn cmd_regen() -> Result<()> {
     }
 
     let mod_path = generated_dir.join("mod.rs");
-    fs::write(&mod_path, &mod_content).map_err(|e| Error::Io(e))?;
+    fs::write(&mod_path, &mod_content).map_err(Error::Io)?;
     println!("✓ Generated: {}", mod_path.display());
 
     println!("\n✓ Regenerated {} modules from specs/", modules.len());
@@ -340,18 +347,26 @@ fn cmd_selfcheck() -> Result<()> {
     let mut passed = 0;
     let mut failed = 0;
 
-    for entry in fs::read_dir(&specs_dir).map_err(|e| Error::Io(e))? {
-        let entry = entry.map_err(|e| Error::Io(e))?;
+    for entry in fs::read_dir(&specs_dir).map_err(Error::Io)? {
+        let entry = entry.map_err(Error::Io)?;
         let path = entry.path();
 
-        if path.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
-            let spec_content = fs::read_to_string(&path).map_err(|e| Error::Io(e))?;
+        if path
+            .extension()
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false)
+        {
+            let spec_content = fs::read_to_string(&path).map_err(Error::Io)?;
             let spec = Spec::from_yaml(&spec_content)?;
 
             // Check if generated file exists
             let generated_path = generated_dir.join(format!("{}.rs", spec.id));
             if !generated_path.exists() {
-                println!("✗ Missing: {} (expected from {})", generated_path.display(), path.display());
+                println!(
+                    "✗ Missing: {} (expected from {})",
+                    generated_path.display(),
+                    path.display()
+                );
                 failed += 1;
                 continue;
             }
@@ -359,21 +374,19 @@ fn cmd_selfcheck() -> Result<()> {
             // Regenerate expected code
             let expected_code = render(&spec, Target::Rust);
             let expected_tests = generate_tests(&spec, Target::Rust);
-            let expected_full = format!("{}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n\n{}\n}}\n", expected_code, expected_tests);
+            let expected_full = format!(
+                "{}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n\n{}\n}}\n",
+                expected_code, expected_tests
+            );
 
             // Read actual generated code
-            let actual = fs::read_to_string(&generated_path).map_err(|e| Error::Io(e))?;
+            let actual = fs::read_to_string(&generated_path).map_err(Error::Io)?;
 
             // Compare (ignoring timestamp and hash comments which vary between runs)
-            let filter_metadata = |l: &&str| {
-                !l.starts_with("// GENERATED:") && !l.starts_with("// SPEC HASH:")
-            };
-            let expected_lines: Vec<&str> = expected_full.lines()
-                .filter(filter_metadata)
-                .collect();
-            let actual_lines: Vec<&str> = actual.lines()
-                .filter(filter_metadata)
-                .collect();
+            let filter_metadata =
+                |l: &&str| !l.starts_with("// GENERATED:") && !l.starts_with("// SPEC HASH:");
+            let expected_lines: Vec<&str> = expected_full.lines().filter(filter_metadata).collect();
+            let actual_lines: Vec<&str> = actual.lines().filter(filter_metadata).collect();
 
             if expected_lines == actual_lines {
                 println!("✓ {}: matches spec", spec.id);

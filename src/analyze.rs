@@ -269,15 +269,6 @@ impl Analyzer {
 
         self.find_magic_numbers(&func.body, &mut issues);
 
-        FunctionMetrics {
-            lines,
-            cyclomatic_complexity: complexity,
-            max_nesting,
-            parameters: func.params.len(),
-            decision_points: decisions,
-            return_points,
-        };
-
         FunctionAnalysis {
             name: func.name.clone(),
             metrics: FunctionMetrics {

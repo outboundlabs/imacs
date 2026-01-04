@@ -9,8 +9,7 @@
 
 use super::predicates::{extract_predicates, Predicate, PredicateSet};
 use crate::cel::CelCompiler;
-use crate::error::{Error, Result};
-use crate::spec::{Rule, Spec};
+use crate::spec::Spec;
 use quine_mc_cluskey::Bool;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -171,10 +170,7 @@ pub fn analyze_completeness(spec: &Spec) -> IncompletenessReport {
             let rule_combos = find_matching_combinations(cel_expr, &predicate_set);
             for combo in rule_combos {
                 covered.insert(combo);
-                combo_rules
-                    .entry(combo)
-                    .or_insert_with(Vec::new)
-                    .push(rule.id.clone());
+                combo_rules.entry(combo).or_default().push(rule.id.clone());
             }
         }
     }
@@ -217,7 +213,9 @@ pub fn analyze_completeness(spec: &Spec) -> IncompletenessReport {
         missing_cases,
         overlaps,
         predicates,
-        can_minimize: minimized_count.map(|c| c < spec.rules.len()).unwrap_or(false),
+        can_minimize: minimized_count
+            .map(|c| c < spec.rules.len())
+            .unwrap_or(false),
         original_rule_count: spec.rules.len(),
         minimized_rule_count: minimized_count,
     }
@@ -283,7 +281,9 @@ fn expression_matches(
                 || expression_matches(right, combo, predicate_set)
         }
 
-        E::Unary(cel_parser::UnaryOp::Not, inner) => !expression_matches(inner, combo, predicate_set),
+        E::Unary(cel_parser::UnaryOp::Not, inner) => {
+            !expression_matches(inner, combo, predicate_set)
+        }
 
         E::Relation(left, op, right) => {
             // Try to match against our predicates
@@ -294,8 +294,8 @@ fn expression_matches(
             };
 
             // Build a predicate and check if it's in our set
-            use cel_parser::RelationOp;
             use super::predicates::{ComparisonOp, LiteralValue};
+            use cel_parser::RelationOp;
 
             let pred = match (op, right.as_ref()) {
                 (RelationOp::GreaterThan, E::Atom(cel_parser::Atom::Int(i))) => {
@@ -357,12 +357,8 @@ fn expression_matches(
             true
         }
 
-        E::Atom(atom) => {
-            match atom {
-                cel_parser::Atom::Bool(b) => *b,
-                _ => true, // Non-boolean atoms assumed true in boolean context
-            }
-        }
+        E::Atom(cel_parser::Atom::Bool(b)) => *b,
+        E::Atom(_) => true, // Non-boolean atoms assumed true in boolean context
 
         // For other expressions, assume they match (conservative)
         _ => true,
@@ -430,12 +426,10 @@ fn build_overlap(combo: u64, rules: &[String], predicate_set: &PredicateSet) -> 
         .map(|pv| {
             if pv.value {
                 pv.cel_expression.clone()
+            } else if let Some(pred) = predicate_set.get(pv.predicate_id) {
+                pred.negated().to_cel_string()
             } else {
-                if let Some(pred) = predicate_set.get(pv.predicate_id) {
-                    pred.negated().to_cel_string()
-                } else {
-                    format!("!{}", pv.cel_expression)
-                }
+                format!("!{}", pv.cel_expression)
             }
         })
         .collect();
@@ -455,13 +449,35 @@ fn try_minimize(spec: &Spec, predicate_set: &PredicateSet) -> Option<usize> {
         return None;
     }
 
+    // Build a mapping of used predicate indices to contiguous indices (0, 1, 2, ...)
+    // quine_mc_cluskey requires continuous naming scheme
+    let mut used_indices: Vec<usize> = Vec::new();
+    for rule in &spec.rules {
+        if let Some(cel_expr) = &rule.when {
+            collect_used_indices(cel_expr, predicate_set, &mut used_indices);
+        }
+    }
+    used_indices.sort();
+    used_indices.dedup();
+
+    // Create mapping: original index -> contiguous index
+    let index_map: HashMap<usize, u8> = used_indices
+        .iter()
+        .enumerate()
+        .map(|(new_idx, &old_idx)| (old_idx, new_idx as u8))
+        .collect();
+
+    if index_map.is_empty() {
+        return None;
+    }
+
     // Build boolean expression for each output value
     // For now, just check if any simplification is possible
     let mut all_rules_as_terms: Vec<Bool> = Vec::new();
 
     for rule in &spec.rules {
         if let Some(cel_expr) = &rule.when {
-            if let Some(bool_expr) = cel_to_bool(cel_expr, predicate_set) {
+            if let Some(bool_expr) = cel_to_bool_mapped(cel_expr, predicate_set, &index_map) {
                 all_rules_as_terms.push(bool_expr);
             }
         }
@@ -487,14 +503,71 @@ fn try_minimize(spec: &Spec, predicate_set: &PredicateSet) -> Option<usize> {
     Some(simplified_count)
 }
 
-/// Convert CEL expression to quine-mc_cluskey Bool
-fn cel_to_bool(cel_expr: &str, predicate_set: &PredicateSet) -> Option<Bool> {
-    let ast = CelCompiler::parse(cel_expr).ok()?;
-    ast_to_bool(&ast, predicate_set)
+/// Collect all predicate indices used in a CEL expression
+fn collect_used_indices(cel_expr: &str, predicate_set: &PredicateSet, indices: &mut Vec<usize>) {
+    if let Ok(ast) = CelCompiler::parse(cel_expr) {
+        collect_indices_from_ast(&ast, predicate_set, indices);
+    }
 }
 
-/// Convert CEL AST to quine-mc_cluskey Bool
-fn ast_to_bool(expr: &cel_parser::Expression, predicate_set: &PredicateSet) -> Option<Bool> {
+/// Recursively collect indices from AST
+fn collect_indices_from_ast(
+    expr: &cel_parser::Expression,
+    predicate_set: &PredicateSet,
+    indices: &mut Vec<usize>,
+) {
+    use cel_parser::Expression as E;
+
+    match expr {
+        E::Ident(name) => {
+            let name_str = name.to_string();
+            for (idx, pred) in predicate_set.predicates.iter().enumerate() {
+                if let Predicate::BoolVar(var_name) = pred {
+                    if var_name == &name_str || var_name == &format!("!{}", name_str) {
+                        indices.push(idx);
+                        return;
+                    }
+                }
+            }
+        }
+        E::And(left, right) | E::Or(left, right) => {
+            collect_indices_from_ast(left, predicate_set, indices);
+            collect_indices_from_ast(right, predicate_set, indices);
+        }
+        E::Unary(_, inner) => {
+            collect_indices_from_ast(inner, predicate_set, indices);
+        }
+        E::Relation(_, _, _) => {
+            // Try to find this relation as a predicate
+            let cel_str = format!("{:?}", expr);
+            if let Ok(preds) = extract_predicates(&cel_str) {
+                if let Some(pred) = preds.into_iter().next() {
+                    if let Some(idx) = predicate_set.index_of(&pred) {
+                        indices.push(idx);
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Convert CEL expression to quine-mc_cluskey Bool with index mapping
+fn cel_to_bool_mapped(
+    cel_expr: &str,
+    predicate_set: &PredicateSet,
+    index_map: &HashMap<usize, u8>,
+) -> Option<Bool> {
+    let ast = CelCompiler::parse(cel_expr).ok()?;
+    ast_to_bool_mapped(&ast, predicate_set, index_map)
+}
+
+/// Convert CEL AST to quine-mc_cluskey Bool with index mapping for continuous naming
+fn ast_to_bool_mapped(
+    expr: &cel_parser::Expression,
+    predicate_set: &PredicateSet,
+    index_map: &HashMap<usize, u8>,
+) -> Option<Bool> {
     use cel_parser::Expression as E;
 
     match expr {
@@ -504,10 +577,14 @@ fn ast_to_bool(expr: &cel_parser::Expression, predicate_set: &PredicateSet) -> O
             for (idx, pred) in predicate_set.predicates.iter().enumerate() {
                 if let Predicate::BoolVar(var_name) = pred {
                     if var_name == &name_str {
-                        return Some(Bool::Term(idx as u8));
+                        if let Some(&mapped_idx) = index_map.get(&idx) {
+                            return Some(Bool::Term(mapped_idx));
+                        }
                     }
                     if var_name == &format!("!{}", name_str) {
-                        return Some(Bool::Not(Box::new(Bool::Term(idx as u8))));
+                        if let Some(&mapped_idx) = index_map.get(&idx) {
+                            return Some(Bool::Not(Box::new(Bool::Term(mapped_idx))));
+                        }
                     }
                 }
             }
@@ -515,7 +592,9 @@ fn ast_to_bool(expr: &cel_parser::Expression, predicate_set: &PredicateSet) -> O
             if let Ok(preds) = extract_predicates(&name_str) {
                 if let Some(pred) = preds.into_iter().next() {
                     if let Some(idx) = predicate_set.index_of(&pred) {
-                        return Some(Bool::Term(idx as u8));
+                        if let Some(&mapped_idx) = index_map.get(&idx) {
+                            return Some(Bool::Term(mapped_idx));
+                        }
                     }
                 }
             }
@@ -523,19 +602,19 @@ fn ast_to_bool(expr: &cel_parser::Expression, predicate_set: &PredicateSet) -> O
         }
 
         E::And(left, right) => {
-            let l = ast_to_bool(left, predicate_set)?;
-            let r = ast_to_bool(right, predicate_set)?;
+            let l = ast_to_bool_mapped(left, predicate_set, index_map)?;
+            let r = ast_to_bool_mapped(right, predicate_set, index_map)?;
             Some(Bool::And(vec![l, r]))
         }
 
         E::Or(left, right) => {
-            let l = ast_to_bool(left, predicate_set)?;
-            let r = ast_to_bool(right, predicate_set)?;
+            let l = ast_to_bool_mapped(left, predicate_set, index_map)?;
+            let r = ast_to_bool_mapped(right, predicate_set, index_map)?;
             Some(Bool::Or(vec![l, r]))
         }
 
         E::Unary(cel_parser::UnaryOp::Not, inner) => {
-            let i = ast_to_bool(inner, predicate_set)?;
+            let i = ast_to_bool_mapped(inner, predicate_set, index_map)?;
             Some(Bool::Not(Box::new(i)))
         }
 
@@ -545,7 +624,9 @@ fn ast_to_bool(expr: &cel_parser::Expression, predicate_set: &PredicateSet) -> O
             if let Ok(preds) = extract_predicates(&cel_str) {
                 if let Some(pred) = preds.into_iter().next() {
                     if let Some(idx) = predicate_set.index_of(&pred) {
-                        return Some(Bool::Term(idx as u8));
+                        if let Some(&mapped_idx) = index_map.get(&idx) {
+                            return Some(Bool::Term(mapped_idx));
+                        }
                     }
                 }
             }
@@ -570,7 +651,7 @@ fn count_terms(exprs: &[Bool]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spec::{Output, Rule, Spec, Variable, VarType, ConditionValue};
+    use crate::spec::{ConditionValue, Output, Rule, Spec, VarType, Variable};
 
     fn make_test_spec() -> Spec {
         Spec {

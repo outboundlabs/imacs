@@ -10,12 +10,12 @@
 //!
 //! This module uses genco for code generation across languages.
 
+mod csharp;
+mod go;
+mod java;
+mod python;
 mod rust;
 mod typescript;
-mod python;
-mod csharp;
-mod java;
-mod go;
 
 use crate::cel::Target;
 use crate::spec::{Spec, VarType};
@@ -23,12 +23,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Re-export renderers
+pub use csharp::render as render_csharp;
+pub use go::render as render_go;
+pub use java::render as render_java;
+pub use python::render as render_python;
 pub use rust::render as render_rust;
 pub use typescript::render as render_typescript;
-pub use python::render as render_python;
-pub use csharp::render as render_csharp;
-pub use java::render as render_java;
-pub use go::render as render_go;
 
 /// Render an orchestrator to target language
 pub fn render_orchestrator(
@@ -146,7 +146,12 @@ impl Orchestrator {
         errors
     }
 
-    fn validate_chain(&self, steps: &[ChainStep], specs: &HashMap<String, Spec>, errors: &mut Vec<String>) {
+    fn validate_chain(
+        &self,
+        steps: &[ChainStep],
+        specs: &HashMap<String, Spec>,
+        errors: &mut Vec<String>,
+    ) {
         for step in steps {
             match step {
                 ChainStep::Call(call) => {
@@ -540,6 +545,243 @@ pub fn collect_step_ids(steps: &[ChainStep]) -> Vec<String> {
     ids
 }
 
+/// Count total steps in an orchestrator chain (recursive)
+pub fn count_steps(steps: &[ChainStep]) -> usize {
+    let mut count = 0;
+    for step in steps {
+        count += 1;
+        match step {
+            ChainStep::Parallel(p) => count += count_steps(&p.steps),
+            ChainStep::Branch(b) => {
+                for case_steps in b.cases.values() {
+                    count += count_steps(case_steps);
+                }
+                if let Some(d) = &b.default {
+                    count += count_steps(d);
+                }
+            }
+            ChainStep::Loop(l) => count += count_steps(&l.steps),
+            ChainStep::ForEach(f) => count += count_steps(&f.steps),
+            ChainStep::Try(t) => {
+                count += count_steps(&t.try_steps);
+                if let Some(c) = &t.catch {
+                    count += count_steps(&c.steps);
+                }
+                if let Some(f) = &t.finally {
+                    count += count_steps(f);
+                }
+            }
+            _ => {}
+        }
+    }
+    count
+}
+
+/// Check if a chain of steps contains any spec calls
+fn contains_spec_call(steps: &[ChainStep]) -> bool {
+    for step in steps {
+        match step {
+            ChainStep::Call(_) | ChainStep::Dynamic(_) => return true,
+            ChainStep::Parallel(p) => {
+                if contains_spec_call(&p.steps) {
+                    return true;
+                }
+            }
+            ChainStep::Branch(b) => {
+                for case_steps in b.cases.values() {
+                    if contains_spec_call(case_steps) {
+                        return true;
+                    }
+                }
+                if let Some(d) = &b.default {
+                    if contains_spec_call(d) {
+                        return true;
+                    }
+                }
+            }
+            ChainStep::Loop(l) => {
+                if contains_spec_call(&l.steps) {
+                    return true;
+                }
+            }
+            ChainStep::ForEach(f) => {
+                if contains_spec_call(&f.steps) {
+                    return true;
+                }
+            }
+            ChainStep::Try(t) => {
+                if contains_spec_call(&t.try_steps) {
+                    return true;
+                }
+                if let Some(c) = &t.catch {
+                    if contains_spec_call(&c.steps) {
+                        return true;
+                    }
+                }
+                if let Some(f) = &t.finally {
+                    if contains_spec_call(f) {
+                        return true;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Calculate cyclomatic complexity of an orchestrator chain
+/// Each decision point (Branch, Loop, ForEach, Gate, Try) adds 1 to complexity
+pub fn calculate_complexity(steps: &[ChainStep]) -> usize {
+    let mut complexity = 1; // Base complexity
+    for step in steps {
+        match step {
+            ChainStep::Branch(b) => {
+                // Each case adds a path
+                complexity += b.cases.len();
+                for case_steps in b.cases.values() {
+                    complexity += calculate_complexity(case_steps) - 1;
+                }
+                if let Some(d) = &b.default {
+                    complexity += calculate_complexity(d) - 1;
+                }
+            }
+            ChainStep::Loop(l) => {
+                complexity += 1; // Loop adds one decision
+                complexity += calculate_complexity(&l.steps) - 1;
+            }
+            ChainStep::ForEach(f) => {
+                complexity += 1; // ForEach adds one decision
+                complexity += calculate_complexity(&f.steps) - 1;
+            }
+            ChainStep::Gate(_) => {
+                complexity += 1; // Gate is a decision point
+            }
+            ChainStep::Try(t) => {
+                complexity += 1; // Try/catch is a decision
+                complexity += calculate_complexity(&t.try_steps) - 1;
+                if let Some(c) = &t.catch {
+                    complexity += calculate_complexity(&c.steps) - 1;
+                }
+                if let Some(f) = &t.finally {
+                    complexity += calculate_complexity(f) - 1;
+                }
+            }
+            ChainStep::Parallel(p) => {
+                complexity += calculate_complexity(&p.steps) - 1;
+            }
+            _ => {}
+        }
+    }
+    complexity
+}
+
+/// Complexity analysis result for an orchestrator
+#[derive(Debug, Clone)]
+pub struct ComplexityReport {
+    /// Total number of steps
+    pub step_count: usize,
+    /// Cyclomatic complexity
+    pub cyclomatic_complexity: usize,
+    /// Warnings about potential issues
+    pub warnings: Vec<String>,
+}
+
+impl Orchestrator {
+    /// Analyze orchestrator complexity and return warnings
+    /// FM-2: Orchestrator Complexity Escape Hatch mitigation
+    pub fn analyze_complexity(&self) -> ComplexityReport {
+        let mut warnings = Vec::new();
+        let step_count = count_steps(&self.chain);
+        let cyclomatic_complexity = calculate_complexity(&self.chain);
+
+        // FM-2 Lint: Flag orchestrators with >10 steps
+        if step_count > 10 {
+            warnings.push(format!(
+                "Orchestrator '{}' has {} steps (>10). Consider decomposing into smaller orchestrators.",
+                self.id, step_count
+            ));
+        }
+
+        // FM-2 Lint: High cyclomatic complexity
+        if cyclomatic_complexity > 10 {
+            warnings.push(format!(
+                "Orchestrator '{}' has cyclomatic complexity {} (>10). Consider simplifying control flow.",
+                self.id, cyclomatic_complexity
+            ));
+        }
+
+        // FM-2 Lint: Check Branch/Loop without spec calls
+        self.check_control_flow_warnings(&self.chain, &mut warnings);
+
+        ComplexityReport {
+            step_count,
+            cyclomatic_complexity,
+            warnings,
+        }
+    }
+
+    fn check_control_flow_warnings(&self, steps: &[ChainStep], warnings: &mut Vec<String>) {
+        for step in steps {
+            match step {
+                ChainStep::Branch(b) => {
+                    // Check if branch has any spec calls
+                    let mut has_spec = false;
+                    for case_steps in b.cases.values() {
+                        if contains_spec_call(case_steps) {
+                            has_spec = true;
+                        }
+                        self.check_control_flow_warnings(case_steps, warnings);
+                    }
+                    if let Some(d) = &b.default {
+                        if contains_spec_call(d) {
+                            has_spec = true;
+                        }
+                        self.check_control_flow_warnings(d, warnings);
+                    }
+                    if !has_spec {
+                        warnings.push(format!(
+                            "Branch step '{}' contains no spec calls. Consider extracting logic to a Spec for better verification.",
+                            b.id
+                        ));
+                    }
+                }
+                ChainStep::Loop(l) => {
+                    if !contains_spec_call(&l.steps) {
+                        warnings.push(format!(
+                            "Loop step '{}' contains no spec calls. Consider extracting logic to a Spec for better verification.",
+                            l.id
+                        ));
+                    }
+                    self.check_control_flow_warnings(&l.steps, warnings);
+                }
+                ChainStep::ForEach(f) => {
+                    if !contains_spec_call(&f.steps) {
+                        warnings.push(format!(
+                            "ForEach step '{}' contains no spec calls. Consider extracting logic to a Spec for better verification.",
+                            f.id
+                        ));
+                    }
+                    self.check_control_flow_warnings(&f.steps, warnings);
+                }
+                ChainStep::Parallel(p) => {
+                    self.check_control_flow_warnings(&p.steps, warnings);
+                }
+                ChainStep::Try(t) => {
+                    self.check_control_flow_warnings(&t.try_steps, warnings);
+                    if let Some(c) = &t.catch {
+                        self.check_control_flow_warnings(&c.steps, warnings);
+                    }
+                    if let Some(f) = &t.finally {
+                        self.check_control_flow_warnings(f, warnings);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -597,5 +839,191 @@ chain:
     fn test_to_camel() {
         assert_eq!(to_camel("hello_world"), "helloWorld");
         assert_eq!(to_camel("order_flow"), "orderFlow");
+    }
+
+    #[test]
+    fn test_count_steps() {
+        let yaml = r#"
+id: simple
+chain:
+  - step: call
+    id: step1
+    spec: spec_a
+    inputs: {}
+  - step: call
+    id: step2
+    spec: spec_b
+    inputs: {}
+"#;
+        let orch = Orchestrator::from_yaml(yaml).unwrap();
+        assert_eq!(count_steps(&orch.chain), 2);
+    }
+
+    #[test]
+    fn test_count_steps_nested() {
+        let yaml = r#"
+id: nested
+chain:
+  - step: branch
+    id: brancher
+    on: "condition"
+    cases:
+      "true":
+        - step: call
+          id: inner1
+          spec: spec_a
+          inputs: {}
+        - step: call
+          id: inner2
+          spec: spec_b
+          inputs: {}
+"#;
+        let orch = Orchestrator::from_yaml(yaml).unwrap();
+        // 1 branch + 2 calls = 3 steps
+        assert_eq!(count_steps(&orch.chain), 3);
+    }
+
+    #[test]
+    fn test_calculate_complexity() {
+        let yaml = r#"
+id: simple
+chain:
+  - step: call
+    id: step1
+    spec: spec_a
+    inputs: {}
+  - step: call
+    id: step2
+    spec: spec_b
+    inputs: {}
+"#;
+        let orch = Orchestrator::from_yaml(yaml).unwrap();
+        // No decisions, base complexity = 1
+        assert_eq!(calculate_complexity(&orch.chain), 1);
+    }
+
+    #[test]
+    fn test_calculate_complexity_with_gate() {
+        let yaml = r#"
+id: gated
+chain:
+  - step: call
+    id: step1
+    spec: spec_a
+    inputs: {}
+  - step: gate
+    id: check
+    condition: "step1.valid"
+"#;
+        let orch = Orchestrator::from_yaml(yaml).unwrap();
+        // Base 1 + 1 gate = 2
+        assert_eq!(calculate_complexity(&orch.chain), 2);
+    }
+
+    #[test]
+    fn test_analyze_complexity_too_many_steps() {
+        // Create an orchestrator with >10 steps
+        let yaml = r#"
+id: big_orch
+chain:
+  - step: call
+    id: s1
+    spec: a
+    inputs: {}
+  - step: call
+    id: s2
+    spec: a
+    inputs: {}
+  - step: call
+    id: s3
+    spec: a
+    inputs: {}
+  - step: call
+    id: s4
+    spec: a
+    inputs: {}
+  - step: call
+    id: s5
+    spec: a
+    inputs: {}
+  - step: call
+    id: s6
+    spec: a
+    inputs: {}
+  - step: call
+    id: s7
+    spec: a
+    inputs: {}
+  - step: call
+    id: s8
+    spec: a
+    inputs: {}
+  - step: call
+    id: s9
+    spec: a
+    inputs: {}
+  - step: call
+    id: s10
+    spec: a
+    inputs: {}
+  - step: call
+    id: s11
+    spec: a
+    inputs: {}
+"#;
+        let orch = Orchestrator::from_yaml(yaml).unwrap();
+        let report = orch.analyze_complexity();
+        assert_eq!(report.step_count, 11);
+        assert!(report.warnings.iter().any(|w| w.contains(">10")));
+    }
+
+    #[test]
+    fn test_analyze_complexity_branch_without_spec() {
+        let yaml = r#"
+id: branch_only
+chain:
+  - step: branch
+    id: my_branch
+    on: "condition"
+    cases:
+      "a":
+        - step: compute
+          id: compute1
+          name: result1
+          expr: "x + 1"
+      "b":
+        - step: compute
+          id: compute2
+          name: result2
+          expr: "x + 2"
+"#;
+        let orch = Orchestrator::from_yaml(yaml).unwrap();
+        let report = orch.analyze_complexity();
+        // Should warn about branch without spec calls
+        assert!(report
+            .warnings
+            .iter()
+            .any(|w| w.contains("my_branch") && w.contains("no spec calls")));
+    }
+
+    #[test]
+    fn test_analyze_complexity_branch_with_spec_no_warning() {
+        let yaml = r#"
+id: branch_with_spec
+chain:
+  - step: branch
+    id: my_branch
+    on: "condition"
+    cases:
+      "a":
+        - step: call
+          id: call1
+          spec: spec_a
+          inputs: {}
+"#;
+        let orch = Orchestrator::from_yaml(yaml).unwrap();
+        let report = orch.analyze_complexity();
+        // Should NOT warn about this branch since it has a spec call
+        assert!(!report.warnings.iter().any(|w| w.contains("my_branch")));
     }
 }

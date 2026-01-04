@@ -10,10 +10,10 @@
 //! - `status in ["active", "pending"]` (membership)
 
 use crate::cel::CelCompiler;
-use crate::error::{Error, Result};
+use crate::error::Result;
 use cel_parser::{Atom, Expression as CelExpr, Member, RelationOp};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 /// An atomic predicate extracted from CEL
@@ -69,10 +69,10 @@ impl Hash for Predicate {
 /// Comparison operators
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ComparisonOp {
-    Lt,  // <
-    Le,  // <=
-    Gt,  // >
-    Ge,  // >=
+    Lt, // <
+    Le, // <=
+    Gt, // >
+    Ge, // >=
 }
 
 impl std::fmt::Display for ComparisonOp {
@@ -136,7 +136,11 @@ impl Predicate {
                 format!("{} {} {}", var, op, value)
             }
 
-            Predicate::Equality { var, value, negated } => {
+            Predicate::Equality {
+                var,
+                value,
+                negated,
+            } => {
                 if *negated {
                     format!("{} != {}", var, value)
                 } else {
@@ -144,7 +148,11 @@ impl Predicate {
                 }
             }
 
-            Predicate::Membership { var, values, negated } => {
+            Predicate::Membership {
+                var,
+                values,
+                negated,
+            } => {
                 let vals: Vec<String> = values.iter().map(|v| v.to_string()).collect();
                 if *negated {
                     format!("!({} in [{}])", var, vals.join(", "))
@@ -153,7 +161,12 @@ impl Predicate {
                 }
             }
 
-            Predicate::StringOp { var, op, arg, negated } => {
+            Predicate::StringOp {
+                var,
+                op,
+                arg,
+                negated,
+            } => {
                 let expr = format!("{}.{}(\"{}\")", var, op, arg);
                 if *negated {
                     format!("!{}", expr)
@@ -184,30 +197,37 @@ impl Predicate {
                 }
             }
 
-            Predicate::Equality { var, value, negated } => {
-                Predicate::Equality {
-                    var: var.clone(),
-                    value: value.clone(),
-                    negated: !negated,
-                }
-            }
+            Predicate::Equality {
+                var,
+                value,
+                negated,
+            } => Predicate::Equality {
+                var: var.clone(),
+                value: value.clone(),
+                negated: !negated,
+            },
 
-            Predicate::Membership { var, values, negated } => {
-                Predicate::Membership {
-                    var: var.clone(),
-                    values: values.clone(),
-                    negated: !negated,
-                }
-            }
+            Predicate::Membership {
+                var,
+                values,
+                negated,
+            } => Predicate::Membership {
+                var: var.clone(),
+                values: values.clone(),
+                negated: !negated,
+            },
 
-            Predicate::StringOp { var, op, arg, negated } => {
-                Predicate::StringOp {
-                    var: var.clone(),
-                    op: *op,
-                    arg: arg.clone(),
-                    negated: !negated,
-                }
-            }
+            Predicate::StringOp {
+                var,
+                op,
+                arg,
+                negated,
+            } => Predicate::StringOp {
+                var: var.clone(),
+                op: *op,
+                arg: arg.clone(),
+                negated: !negated,
+            },
         }
     }
 }
@@ -378,10 +398,7 @@ fn extract_relation(
     // Handle `in` operator first (RHS is a list, not a literal)
     if *op == RelationOp::In {
         if let CelExpr::List(items) = right {
-            let values: Vec<LiteralValue> = items
-                .iter()
-                .filter_map(extract_literal)
-                .collect();
+            let values: Vec<LiteralValue> = items.iter().filter_map(extract_literal).collect();
             if !values.is_empty() {
                 return Some(Predicate::Membership {
                     var,
@@ -410,22 +427,38 @@ fn extract_relation(
         }),
 
         RelationOp::LessThan => {
-            let op = if negated { ComparisonOp::Ge } else { ComparisonOp::Lt };
+            let op = if negated {
+                ComparisonOp::Ge
+            } else {
+                ComparisonOp::Lt
+            };
             Some(Predicate::Comparison { var, op, value })
         }
 
         RelationOp::LessThanEq => {
-            let op = if negated { ComparisonOp::Gt } else { ComparisonOp::Le };
+            let op = if negated {
+                ComparisonOp::Gt
+            } else {
+                ComparisonOp::Le
+            };
             Some(Predicate::Comparison { var, op, value })
         }
 
         RelationOp::GreaterThan => {
-            let op = if negated { ComparisonOp::Le } else { ComparisonOp::Gt };
+            let op = if negated {
+                ComparisonOp::Le
+            } else {
+                ComparisonOp::Gt
+            };
             Some(Predicate::Comparison { var, op, value })
         }
 
         RelationOp::GreaterThanEq => {
-            let op = if negated { ComparisonOp::Lt } else { ComparisonOp::Ge };
+            let op = if negated {
+                ComparisonOp::Lt
+            } else {
+                ComparisonOp::Ge
+            };
             Some(Predicate::Comparison { var, op, value })
         }
 
@@ -488,7 +521,7 @@ fn extract_from_member(
         Member::FunctionCall(args) => {
             // Check if base is an identifier (top-level function call)
             if let CelExpr::Ident(func_name) = base {
-                let func = func_name.to_string();
+                let _func = func_name.to_string();
                 // Functions like has(), size() - extract from args
                 for arg in args {
                     extract_from_ast(arg, predicates, negated);

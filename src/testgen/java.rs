@@ -25,8 +25,16 @@ pub fn generate(spec: &Spec, _config: &TestConfig) -> String {
 
         out.push_str("    @Test\n");
         out.push_str(&format!("    public void {}() {{\n", test_name));
-        out.push_str(&format!("        // {}: {} → {}\n", rule.id, rule.as_cel().unwrap_or_default(), rule.then));
-        out.push_str(&format!("        assertEquals({}, {}.evaluate(/* input */));\n", expected, class_name));
+        out.push_str(&format!(
+            "        // {}: {} → {}\n",
+            rule.id,
+            rule.as_cel().unwrap_or_default(),
+            rule.then
+        ));
+        out.push_str(&format!(
+            "        assertEquals({}, {}.evaluate(/* input */));\n",
+            expected, class_name
+        ));
         out.push_str("    }\n\n");
     }
 

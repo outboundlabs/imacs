@@ -194,10 +194,7 @@ pub enum AstNode {
     },
 
     /// Await expression (async)
-    Await {
-        expr: Box<AstNode>,
-        span: Span,
-    },
+    Await { expr: Box<AstNode>, span: Span },
 
     /// Closure/lambda expression
     Closure {

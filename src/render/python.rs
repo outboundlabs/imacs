@@ -20,7 +20,7 @@ struct PythonRenderer<'a> {
 impl<'a> PythonRenderer<'a> {
     fn render(&self, spec: &Spec) -> String {
         let mut out = String::new();
-        let ind = &self.config.indent;
+        let _ind = &self.config.indent;
 
         // Header
         if self.config.provenance {
@@ -70,7 +70,9 @@ impl<'a> PythonRenderer<'a> {
         for (i, rule) in spec.rules.iter().enumerate() {
             let condition = rule
                 .as_cel()
-                .map(|cel| CelCompiler::compile(&cel, Target::Python).unwrap_or_else(|_| cel.clone()))
+                .map(|cel| {
+                    CelCompiler::compile(&cel, Target::Python).unwrap_or_else(|_| cel.clone())
+                })
                 .unwrap_or_else(|| "True".into());
 
             if i == 0 {
@@ -101,7 +103,10 @@ impl<'a> PythonRenderer<'a> {
                 self.render_output(default)
             ));
         } else {
-            out.push_str(&format!("{}{}raise ValueError(\"No rule matched\")\n", ind, ind));
+            out.push_str(&format!(
+                "{}{}raise ValueError(\"No rule matched\")\n",
+                ind, ind
+            ));
         }
     }
 
@@ -189,13 +194,7 @@ impl<'a> PythonRenderer<'a> {
             Output::Named(map) => {
                 let fields: Vec<_> = map
                     .iter()
-                    .map(|(k, v)| {
-                        format!(
-                            "\"{}\": {}",
-                            k,
-                            self.render_value(v)
-                        )
-                    })
+                    .map(|(k, v)| format!("\"{}\": {}", k, self.render_value(v)))
                     .collect();
                 format!("{{ {} }}", fields.join(", "))
             }

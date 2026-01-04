@@ -8,23 +8,16 @@ use chrono::Utc;
 
 use super::{is_expression, to_camel_case, to_pascal_case, RenderConfig};
 
-/// Convert snake_case identifiers to camelCase in a compiled expression
-fn translate_vars_to_camel_case(expr: &str, input_names: &[String]) -> String {
-    let mut result = expr.to_string();
-    for name in input_names {
-        if name.contains('_') {
-            let camel = to_camel_case(name);
-            // Use word boundary replacement to avoid partial matches
-            result = result.replace(name.as_str(), &camel);
-        }
-    }
-    result
-}
+use super::{translate_vars, VarTranslation};
 
 /// Render spec to TypeScript code
 pub fn render(spec: &Spec, config: &RenderConfig) -> String {
     let input_names: Vec<String> = spec.inputs.iter().map(|i| i.name.clone()).collect();
-    TypeScriptRenderer { config, input_names }.render(spec)
+    TypeScriptRenderer {
+        config,
+        input_names,
+    }
+    .render(spec)
 }
 
 struct TypeScriptRenderer<'a> {
@@ -85,8 +78,9 @@ impl<'a> TypeScriptRenderer<'a> {
             let condition = rule
                 .as_cel()
                 .map(|cel| {
-                    let compiled = CelCompiler::compile(&cel, Target::TypeScript).unwrap_or_else(|_| cel.clone());
-                    translate_vars_to_camel_case(&compiled, &self.input_names)
+                    let compiled = CelCompiler::compile(&cel, Target::TypeScript)
+                        .unwrap_or_else(|_| cel.clone());
+                    translate_vars(&compiled, &self.input_names, VarTranslation::CamelCase)
                 })
                 .unwrap_or_else(|| "true".into());
 
@@ -165,7 +159,9 @@ impl<'a> TypeScriptRenderer<'a> {
                 if is_expression(s) {
                     // Compile as CEL expression and translate variable names
                     CelCompiler::compile(s, Target::TypeScript)
-                        .map(|compiled| translate_vars_to_camel_case(&compiled, &self.input_names))
+                        .map(|compiled| {
+                            translate_vars(&compiled, &self.input_names, VarTranslation::CamelCase)
+                        })
                         .unwrap_or_else(|_| format!("\"{}\"", s))
                 } else {
                     // Literal string

@@ -62,7 +62,14 @@ fn set_cube_from_ast(
             // Find this predicate in our set
             let pred = Predicate::BoolVar(name_str.clone());
             if let Some(idx) = predicate_set.index_of(&pred) {
-                cube.set_input(idx, if negated { CubeValue::Zero } else { CubeValue::One });
+                cube.set_input(
+                    idx,
+                    if negated {
+                        CubeValue::Zero
+                    } else {
+                        CubeValue::One
+                    },
+                );
             }
         }
 
@@ -79,12 +86,26 @@ fn set_cube_from_ast(
             // Build predicate from relation and find its index
             if let Some(pred) = relation_to_predicate(left, op, right) {
                 if let Some(idx) = predicate_set.index_of(&pred) {
-                    cube.set_input(idx, if negated { CubeValue::Zero } else { CubeValue::One });
+                    cube.set_input(
+                        idx,
+                        if negated {
+                            CubeValue::Zero
+                        } else {
+                            CubeValue::One
+                        },
+                    );
                 } else {
                     // Try negated form
                     let neg_pred = pred.negated();
                     if let Some(idx) = predicate_set.index_of(&neg_pred) {
-                        cube.set_input(idx, if negated { CubeValue::One } else { CubeValue::Zero });
+                        cube.set_input(
+                            idx,
+                            if negated {
+                                CubeValue::One
+                            } else {
+                                CubeValue::Zero
+                            },
+                        );
                     }
                 }
             }
@@ -106,9 +127,9 @@ fn relation_to_predicate(
     op: &cel_parser::RelationOp,
     right: &cel_parser::Expression,
 ) -> Option<Predicate> {
+    use super::predicates::{ComparisonOp, LiteralValue};
     use cel_parser::Expression as E;
     use cel_parser::RelationOp;
-    use super::predicates::{ComparisonOp, LiteralValue};
 
     let var = match left {
         E::Ident(name) => name.to_string(),
@@ -130,13 +151,11 @@ fn relation_to_predicate(
                 value: LiteralValue::Int(*i),
             })
         }
-        (RelationOp::LessThan, E::Atom(cel_parser::Atom::Int(i))) => {
-            Some(Predicate::Comparison {
-                var,
-                op: ComparisonOp::Lt,
-                value: LiteralValue::Int(*i),
-            })
-        }
+        (RelationOp::LessThan, E::Atom(cel_parser::Atom::Int(i))) => Some(Predicate::Comparison {
+            var,
+            op: ComparisonOp::Lt,
+            value: LiteralValue::Int(*i),
+        }),
         (RelationOp::LessThanEq, E::Atom(cel_parser::Atom::Int(i))) => {
             Some(Predicate::Comparison {
                 var,
@@ -144,13 +163,11 @@ fn relation_to_predicate(
                 value: LiteralValue::Int(*i),
             })
         }
-        (RelationOp::Equals, E::Atom(cel_parser::Atom::String(s))) => {
-            Some(Predicate::Equality {
-                var,
-                value: LiteralValue::String(s.to_string()),
-                negated: false,
-            })
-        }
+        (RelationOp::Equals, E::Atom(cel_parser::Atom::String(s))) => Some(Predicate::Equality {
+            var,
+            value: LiteralValue::String(s.to_string()),
+            negated: false,
+        }),
         (RelationOp::NotEquals, E::Atom(cel_parser::Atom::String(s))) => {
             Some(Predicate::Equality {
                 var,
@@ -224,7 +241,7 @@ pub fn minimize_rules(rules: &[Rule], predicate_set: &PredicateSet) -> Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spec::{Rule, Output, ConditionValue};
+    use crate::spec::{ConditionValue, Output, Rule};
 
     #[test]
     fn test_expression_to_cube() {
@@ -262,16 +279,14 @@ mod tests {
         let mut pset = PredicateSet::new();
         pset.add(Predicate::BoolVar("flag".into()));
 
-        let rules = vec![
-            Rule {
-                id: "R1".into(),
-                when: Some("flag".into()),
-                conditions: None,
-                then: Output::Single(ConditionValue::Int(1)),
-                priority: 0,
-                description: None,
-            },
-        ];
+        let rules = vec![Rule {
+            id: "R1".into(),
+            when: Some("flag".into()),
+            conditions: None,
+            then: Output::Single(ConditionValue::Int(1)),
+            priority: 0,
+            description: None,
+        }];
 
         let cover = rules_to_cover(&rules, &pset);
         assert_eq!(cover.len(), 1);

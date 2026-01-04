@@ -34,42 +34,88 @@ impl<'a> PyTestGen<'a> {
             let expected = self.python_value(&rule.then);
 
             out.push_str(&format!("    def {}(self):\n", test_name));
-            out.push_str(&format!("        # {}: {} → {}\n", rule.id, rule.as_cel().unwrap_or_default(), rule.then));
-            out.push_str(&format!("        assert {}({}) == {}\n\n", spec.id, inputs, expected));
+            out.push_str(&format!(
+                "        # {}: {} → {}\n",
+                rule.id,
+                rule.as_cel().unwrap_or_default(),
+                rule.then
+            ));
+            out.push_str(&format!(
+                "        assert {}({}) == {}\n\n",
+                spec.id, inputs, expected
+            ));
         }
 
         if self.config.exhaustive && can_enumerate(spec) {
-            out.push_str(&format!("\nclass Test{}Exhaustive:\n", to_pascal_case(&spec.id)));
+            out.push_str(&format!(
+                "\nclass Test{}Exhaustive:\n",
+                to_pascal_case(&spec.id)
+            ));
             out.push_str("    \"\"\"All input combinations\"\"\"\n\n");
 
             let combinations = generate_combinations(spec);
-            let params: Vec<_> = combinations.iter().map(|(inputs, rule_id, expected)| {
-                let py_inputs: Vec<_> = inputs.iter().map(|v| self.to_python_value(v)).collect();
-                format!("({}, {}, \"{}\")", py_inputs.join(", "), self.to_python_value(expected), rule_id)
-            }).collect();
+            let params: Vec<_> = combinations
+                .iter()
+                .map(|(inputs, rule_id, expected)| {
+                    let py_inputs: Vec<_> =
+                        inputs.iter().map(|v| self.to_python_value(v)).collect();
+                    format!(
+                        "({}, {}, \"{}\")",
+                        py_inputs.join(", "),
+                        self.to_python_value(expected),
+                        rule_id
+                    )
+                })
+                .collect();
 
-            let input_names = spec.inputs.iter().map(|i| i.name.as_str()).collect::<Vec<_>>().join(",");
-            out.push_str(&format!("    @pytest.mark.parametrize(\"{},expected,rule\", [\n", input_names));
+            let input_names = spec
+                .inputs
+                .iter()
+                .map(|i| i.name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            out.push_str(&format!(
+                "    @pytest.mark.parametrize(\"{},expected,rule\", [\n",
+                input_names
+            ));
             for param in params {
                 out.push_str(&format!("        {},\n", param));
             }
             out.push_str("    ])\n");
-            out.push_str(&format!("    def test_combination(self, {}, expected, rule):\n",
-                spec.inputs.iter().map(|i| i.name.as_str()).collect::<Vec<_>>().join(", ")));
-            out.push_str(&format!("        assert {}({}) == expected\n", spec.id,
-                spec.inputs.iter().map(|i| i.name.as_str()).collect::<Vec<_>>().join(", ")));
+            out.push_str(&format!(
+                "    def test_combination(self, {}, expected, rule):\n",
+                spec.inputs
+                    .iter()
+                    .map(|i| i.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            out.push_str(&format!(
+                "        assert {}({}) == expected\n",
+                spec.id,
+                spec.inputs
+                    .iter()
+                    .map(|i| i.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
 
         out
     }
 
     fn generate_inputs(&self, spec: &Spec, rule: &Rule) -> String {
-        spec.inputs.iter().map(|input| {
-            rule.conditions.as_ref()
-                .and_then(|c| c.iter().find(|cond| cond.var == input.name))
-                .map(|c| self.python_condition_value(&c.value))
-                .unwrap_or_else(|| self.default_value(&input.typ))
-        }).collect::<Vec<_>>().join(", ")
+        spec.inputs
+            .iter()
+            .map(|input| {
+                rule.conditions
+                    .as_ref()
+                    .and_then(|c| c.iter().find(|cond| cond.var == input.name))
+                    .map(|c| self.python_condition_value(&c.value))
+                    .unwrap_or_else(|| self.default_value(&input.typ))
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     fn to_python_value(&self, v: &str) -> String {

@@ -85,7 +85,6 @@ pub enum GapReason {
 struct CodeRule {
     conditions: Vec<ExtractedCondition>,
     output: ExtractedOutput,
-    is_default: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -93,13 +92,11 @@ struct ExtractedCondition {
     var: String,
     op: ConditionOp,
     value: ConditionValue,
-    negated: bool,
 }
 
 #[derive(Debug, Clone)]
 enum ExtractedOutput {
     Literal(ConditionValue),
-    Unknown(String),
 }
 
 enum MatchResult {
@@ -161,7 +158,7 @@ impl Verifier {
         // Match spec rules against code
         let mut covered = HashSet::new();
         let mut gaps = Vec::new();
-        let mut warnings = Vec::new();
+        let warnings = Vec::new();
 
         for spec_rule in &spec.rules {
             match self.find_matching_rule(spec_rule, &code_rules, spec) {
@@ -250,12 +247,10 @@ impl Verifier {
                     self.extract_pattern_conditions(&arm.pattern, inputs, &mut arm_conditions);
 
                     let output = self.extract_output(&arm.body);
-                    let is_default = arm.pattern.is_catch_all();
 
                     rules.push(CodeRule {
                         conditions: arm_conditions,
                         output,
-                        is_default,
                     });
                 }
             }
@@ -274,7 +269,6 @@ impl Verifier {
                 rules.push(CodeRule {
                     conditions: then_conditions,
                     output: then_output,
-                    is_default: false,
                 });
 
                 // Else branch
@@ -298,7 +292,6 @@ impl Verifier {
                     rules.push(CodeRule {
                         conditions: current_conditions.clone(),
                         output,
-                        is_default: false,
                     });
                 }
             }
@@ -325,7 +318,6 @@ impl Verifier {
                         var: input.name.clone(),
                         op: ConditionOp::Eq,
                         value: literal_to_condition_value(lit),
-                        negated: false,
                     });
                 }
             }
@@ -348,7 +340,6 @@ impl Verifier {
                     var: var_name.to_string(),
                     op: ConditionOp::Eq,
                     value: literal_to_condition_value(lit),
-                    negated: false,
                 });
             }
             Pattern::Wildcard | Pattern::Binding(_) => {
@@ -407,7 +398,6 @@ impl Verifier {
                             var: name.clone(),
                             op: actual_op,
                             value,
-                            negated: false,
                         });
                     }
                 }
@@ -427,7 +417,6 @@ impl Verifier {
                     var: name.clone(),
                     op: ConditionOp::Eq,
                     value: ConditionValue::Bool(!negated),
-                    negated: false,
                 });
             }
 
@@ -454,7 +443,7 @@ impl Verifier {
             AstNode::Return {
                 value: Some(inner), ..
             } => self.extract_output(inner),
-            _ => ExtractedOutput::Unknown(format!("{:?}", node)),
+            _ => ExtractedOutput::Literal(ConditionValue::Null),
         }
     }
 
@@ -491,7 +480,7 @@ impl Verifier {
         MatchResult::NotFound
     }
 
-    fn build_expected_conditions(&self, rule: &Rule, spec: &Spec) -> Vec<ExtractedCondition> {
+    fn build_expected_conditions(&self, rule: &Rule, _spec: &Spec) -> Vec<ExtractedCondition> {
         let mut conditions = Vec::new();
 
         if let Some(conds) = &rule.conditions {
@@ -500,7 +489,6 @@ impl Verifier {
                     var: cond.var.clone(),
                     op: cond.op,
                     value: cond.value.clone(),
-                    negated: false,
                 });
             }
         }

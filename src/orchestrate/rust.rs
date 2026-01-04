@@ -133,13 +133,13 @@ impl<'a> RustOrchRenderer<'a> {
                     }
                 }
             }
-            ChainStep::Await(await_) => {
+            ChainStep::Await(_await_) => {
                 quote! {
                     // Await: $(&await_.id) (TODO: async support)
                 }
             }
             ChainStep::Emit(emit) => {
-                let data = rust_expr(&emit.data);
+                let _data = rust_expr(&emit.data);
                 quote! {
                     // Emit event: $(&emit.event)
                     // events.push(($(quoted(&emit.event)), $data));

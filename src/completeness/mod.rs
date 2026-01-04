@@ -28,16 +28,43 @@
 //! }
 //! ```
 
-mod predicates;
+mod adapter;
 mod analysis;
 pub mod espresso;
-mod adapter;
+mod predicates;
+mod refactor;
 
-pub use predicates::{Predicate, PredicateSet, extract_predicates};
-pub use analysis::{analyze_completeness, IncompletenessReport, MissingCase, RuleOverlap, PredicateValue, PredicateInfo};
+pub use analysis::{
+    analyze_completeness, IncompletenessReport, MissingCase, PredicateInfo, PredicateValue,
+    RuleOverlap,
+};
+pub use predicates::{
+    extract_predicates, ComparisonOp, LiteralValue, Predicate, PredicateSet, StringOpKind,
+};
 
 // Re-export key espresso types
-pub use espresso::{Cover, Cube, CubeValue, espresso as espresso_minimize, EspressoOptions};
+pub use espresso::{espresso as espresso_minimize, Cover, Cube, CubeValue, EspressoOptions};
 
 // Re-export adapter functions
-pub use adapter::{rules_to_cover, expression_to_cube, cover_to_cel, cube_to_cel, minimize_rules};
+pub use adapter::{cover_to_cel, cube_to_cel, expression_to_cube, minimize_rules, rules_to_cover};
+
+// Re-export refactoring APIs
+pub use refactor::{
+    // Compose API
+    compose,
+    // Decompose API
+    decompose,
+    // Extract from Orchestrator API
+    extract_spec_from_orchestrator,
+    // Minimize API
+    minimize,
+    ChainDefinition,
+    ComposedSpec,
+    DecompositionResult,
+    MinimizedSpec,
+    OrchestratorExtractionResult,
+    OutputToInputMapping,
+    Transformation,
+    TransformationKind,
+    VariableGroup,
+};

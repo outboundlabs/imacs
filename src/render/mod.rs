@@ -8,12 +8,12 @@
 //! - `bool_literal` for boolean literals
 //! - `null_literal` for null/none literals
 
+mod csharp;
+mod go;
+mod java;
+mod python;
 mod rust;
 mod typescript;
-mod python;
-mod csharp;
-mod java;
-mod go;
 
 use crate::cel::Target;
 use crate::spec::*;
@@ -100,6 +100,42 @@ pub(crate) fn to_camel_case(s: &str) -> String {
     }
 }
 
+/// Variable translation mode for different languages
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum VarTranslation {
+    /// Convert snake_case to camelCase (TypeScript, C#)
+    CamelCase,
+    /// Convert snake_case to input.PascalCase (Go)
+    InputPascal,
+    /// Convert snake_case to input.camelCase (Java)
+    InputCamel,
+}
+
+/// Translate variable names in an expression according to the target language convention
+/// Consolidates the per-language translate_vars_* functions (FM-4 mitigation)
+pub(crate) fn translate_vars(expr: &str, input_names: &[String], mode: VarTranslation) -> String {
+    let mut result = expr.to_string();
+    for name in input_names {
+        let replacement = match mode {
+            VarTranslation::CamelCase => {
+                if name.contains('_') {
+                    to_camel_case(name)
+                } else {
+                    continue; // No transformation needed
+                }
+            }
+            VarTranslation::InputPascal => {
+                format!("input.{}", to_pascal_case(name))
+            }
+            VarTranslation::InputCamel => {
+                format!("input.{}", to_camel_case(name))
+            }
+        };
+        result = result.replace(name.as_str(), &replacement);
+    }
+    result
+}
+
 /// Check if a string looks like a CEL expression (contains operators/variables)
 /// vs a simple literal string
 pub(crate) fn is_expression(s: &str) -> bool {
@@ -124,10 +160,12 @@ pub(crate) fn is_expression(s: &str) -> bool {
     }
 
     // Check if it looks like a variable reference (identifier pattern)
-    if !s.contains(' ') && s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '.') {
-        if s.contains('_') || s.contains('.') {
-            return true;
-        }
+    if !s.contains(' ')
+        && s.chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '.')
+        && (s.contains('_') || s.contains('.'))
+    {
+        return true;
     }
 
     false
@@ -254,11 +292,13 @@ rules:
         // CEL compiler may add parentheses, so check for the components
         assert!(
             code.contains("weight_kg * 5.0") && code.contains("+ 7.0"),
-            "Rust should render computed expression as code, not string. Got:\n{}", code
+            "Rust should render computed expression as code, not string. Got:\n{}",
+            code
         );
         assert!(
             !code.contains("\"weight_kg * 5.0"),
-            "Rust should NOT wrap computed expression in quotes. Got:\n{}", code
+            "Rust should NOT wrap computed expression in quotes. Got:\n{}",
+            code
         );
     }
 
@@ -271,11 +311,13 @@ rules:
         // CEL compiler may add parentheses, so check for components with camelCase vars
         assert!(
             code.contains("weightKg * 5.0") && code.contains("+ 7.0"),
-            "TypeScript should render computed expression as code with camelCase. Got:\n{}", code
+            "TypeScript should render computed expression as code with camelCase. Got:\n{}",
+            code
         );
         assert!(
             !code.contains("\"weight_kg * 5.0"),
-            "TypeScript should NOT wrap computed expression in quotes. Got:\n{}", code
+            "TypeScript should NOT wrap computed expression in quotes. Got:\n{}",
+            code
         );
     }
 
@@ -288,11 +330,13 @@ rules:
         // CEL compiler may add parentheses
         assert!(
             code.contains("weight_kg * 5.0") && code.contains("+ 7.0"),
-            "Python should render computed expression as code. Got:\n{}", code
+            "Python should render computed expression as code. Got:\n{}",
+            code
         );
         assert!(
             !code.contains("\"weight_kg * 5.0"),
-            "Python should NOT wrap computed expression in quotes. Got:\n{}", code
+            "Python should NOT wrap computed expression in quotes. Got:\n{}",
+            code
         );
     }
 
@@ -305,11 +349,13 @@ rules:
         // Go uses input.WeightKg, CEL compiler may add parentheses
         assert!(
             code.contains("input.WeightKg * 5.0") && code.contains("+ 7.0"),
-            "Go should render computed expression as code. Got:\n{}", code
+            "Go should render computed expression as code. Got:\n{}",
+            code
         );
         assert!(
             !code.contains("\"weight_kg * 5.0"),
-            "Go should NOT wrap computed expression in quotes. Got:\n{}", code
+            "Go should NOT wrap computed expression in quotes. Got:\n{}",
+            code
         );
     }
 
@@ -322,11 +368,13 @@ rules:
         // C# uses camelCase for destructured vars, CEL compiler may add parentheses
         assert!(
             code.contains("weightKg * 5.0") && code.contains("+ 7.0"),
-            "C# should render computed expression as code. Got:\n{}", code
+            "C# should render computed expression as code. Got:\n{}",
+            code
         );
         assert!(
             !code.contains("\"weight_kg * 5.0"),
-            "C# should NOT wrap computed expression in quotes. Got:\n{}", code
+            "C# should NOT wrap computed expression in quotes. Got:\n{}",
+            code
         );
     }
 
@@ -339,11 +387,13 @@ rules:
         // Java uses input.camelCase, CEL compiler may add parentheses
         assert!(
             code.contains("input.weightKg * 5.0") && code.contains("+ 7.0"),
-            "Java should render computed expression as code. Got:\n{}", code
+            "Java should render computed expression as code. Got:\n{}",
+            code
         );
         assert!(
             !code.contains("\"weight_kg * 5.0"),
-            "Java should NOT wrap computed expression in quotes. Got:\n{}", code
+            "Java should NOT wrap computed expression in quotes. Got:\n{}",
+            code
         );
     }
 
@@ -378,11 +428,13 @@ rules:
 
         assert!(
             code.contains("memberTier === \"gold\"") || code.contains("memberTier === 'gold'"),
-            "TypeScript conditions should use camelCase variable names. Got:\n{}", code
+            "TypeScript conditions should use camelCase variable names. Got:\n{}",
+            code
         );
         assert!(
             !code.contains("member_tier ==="),
-            "TypeScript should NOT use snake_case in conditions. Got:\n{}", code
+            "TypeScript should NOT use snake_case in conditions. Got:\n{}",
+            code
         );
     }
 
@@ -394,7 +446,8 @@ rules:
 
         assert!(
             code.contains("input.MemberTier") || code.contains("MemberTier"),
-            "Go conditions should reference input struct with PascalCase. Got:\n{}", code
+            "Go conditions should reference input struct with PascalCase. Got:\n{}",
+            code
         );
     }
 
@@ -408,7 +461,8 @@ rules:
         if code.contains("var memberTier") {
             assert!(
                 code.contains("memberTier == \"gold\""),
-                "C# should use destructured variable name in condition. Got:\n{}", code
+                "C# should use destructured variable name in condition. Got:\n{}",
+                code
             );
         }
     }
@@ -447,7 +501,8 @@ rules:
 
         assert!(
             code.contains("\"OK\"") || code.contains("\"OK\".to_string()"),
-            "Rust should quote literal string outputs. Got:\n{}", code
+            "Rust should quote literal string outputs. Got:\n{}",
+            code
         );
     }
 
@@ -459,7 +514,8 @@ rules:
 
         assert!(
             code.contains("\"OK\"") || code.contains("'OK'"),
-            "TypeScript should quote literal string outputs. Got:\n{}", code
+            "TypeScript should quote literal string outputs. Got:\n{}",
+            code
         );
     }
 
@@ -471,16 +527,19 @@ rules:
 
         // Python should use if/elif for CEL conditions
         // CEL compiler may add parentheses around the condition
-        let uses_if_else = code.contains("if (member_tier ==") || code.contains("if member_tier ==");
+        let uses_if_else =
+            code.contains("if (member_tier ==") || code.contains("if member_tier ==");
 
         assert!(
             uses_if_else,
-            "Python should use if/elif for CEL conditions. Got:\n{}", code
+            "Python should use if/elif for CEL conditions. Got:\n{}",
+            code
         );
         // Should NOT use wildcard case patterns for CEL
         assert!(
             !code.contains("case _:") || code.contains("case _ if"),
-            "Python should not use bare wildcard matches for CEL conditions. Got:\n{}", code
+            "Python should not use bare wildcard matches for CEL conditions. Got:\n{}",
+            code
         );
     }
 
@@ -500,7 +559,8 @@ rules:
         assert!(
             result.is_ok(),
             "Rendered Rust code should parse successfully. Error: {:?}\nCode:\n{}",
-            result.err(), code
+            result.err(),
+            code
         );
 
         // Should find the expected function
@@ -520,7 +580,8 @@ rules:
         assert!(
             result.is_ok(),
             "Simple spec Rust code should parse. Error: {:?}\nCode:\n{}",
-            result.err(), code
+            result.err(),
+            code
         );
 
         let ast = result.unwrap();
@@ -539,7 +600,8 @@ rules:
         assert!(
             result.is_ok(),
             "String output spec should parse. Error: {:?}\nCode:\n{}",
-            result.err(), code
+            result.err(),
+            code
         );
     }
 
@@ -558,7 +620,8 @@ rules:
         assert!(
             result.is_ok(),
             "TypeScript rendered code should parse. Error: {:?}\nCode:\n{}",
-            result.err(), code
+            result.err(),
+            code
         );
 
         let ast = result.unwrap();
@@ -577,7 +640,8 @@ rules:
         assert!(
             result.is_ok(),
             "Python rendered code should parse. Error: {:?}\nCode:\n{}",
-            result.err(), code
+            result.err(),
+            code
         );
 
         let ast = result.unwrap();
@@ -599,7 +663,8 @@ rules:
         assert!(
             result.is_ok(),
             "Go rendered code should parse. Error: {:?}\nCode:\n{}",
-            result.err(), full_code
+            result.err(),
+            full_code
         );
 
         let ast = result.unwrap();
@@ -617,7 +682,8 @@ rules:
         assert!(
             result.is_ok(),
             "C# rendered code should parse. Error: {:?}\nCode:\n{}",
-            result.err(), code
+            result.err(),
+            code
         );
 
         let ast = result.unwrap();
@@ -635,7 +701,8 @@ rules:
         assert!(
             result.is_ok(),
             "Java rendered code should parse. Error: {:?}\nCode:\n{}",
-            result.err(), code
+            result.err(),
+            code
         );
 
         let ast = result.unwrap();
@@ -648,8 +715,8 @@ rules:
 
     #[test]
     fn rust_ast_has_if_else_structure() {
-        use crate::parse::parse_rust;
         use crate::ast::AstNode;
+        use crate::parse::parse_rust;
 
         let spec = computed_spec();
         let code = render(&spec, Target::Rust);
@@ -667,8 +734,8 @@ rules:
 
     #[test]
     fn typescript_ast_has_if_else_structure() {
-        use crate::parse::parse_typescript;
         use crate::ast::AstNode;
+        use crate::parse::parse_typescript;
 
         let spec = computed_spec();
         let code = render(&spec, Target::TypeScript);
@@ -685,8 +752,8 @@ rules:
 
     #[test]
     fn python_ast_has_if_else_structure() {
-        use crate::parse::parse_python;
         use crate::ast::AstNode;
+        use crate::parse::parse_python;
 
         let spec = computed_spec();
         let code = render(&spec, Target::Python);

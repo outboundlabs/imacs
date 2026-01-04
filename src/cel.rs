@@ -50,15 +50,16 @@ impl CelCompiler {
     /// Evaluate a CEL expression with the given variable bindings
     /// Returns the evaluated Value
     pub fn eval(expr: &str, vars: &HashMap<String, CelValue>) -> Result<CelValue> {
-        let program = Program::compile(expr)
-            .map_err(|e| Error::CelParse(format!("{}: {:?}", expr, e)))?;
+        let program =
+            Program::compile(expr).map_err(|e| Error::CelParse(format!("{}: {:?}", expr, e)))?;
 
         let mut context = Context::default();
         for (name, value) in vars {
             context.add_variable_from_value(name.clone(), value.clone());
         }
 
-        program.execute(&context)
+        program
+            .execute(&context)
             .map_err(|e| Error::CelEval(format!("{}: {:?}", expr, e)))
     }
 
@@ -68,7 +69,8 @@ impl CelCompiler {
         match result {
             Value::Bool(b) => Ok(b),
             other => Err(Error::CelEval(format!(
-                "Expected bool result, got {:?}", other
+                "Expected bool result, got {:?}",
+                other
             ))),
         }
     }
@@ -80,7 +82,8 @@ impl CelCompiler {
             Value::Int(i) => Ok(i),
             Value::UInt(u) => Ok(u as i64),
             other => Err(Error::CelEval(format!(
-                "Expected int result, got {:?}", other
+                "Expected int result, got {:?}",
+                other
             ))),
         }
     }
@@ -93,7 +96,8 @@ impl CelCompiler {
             Value::Int(i) => Ok(i as f64),
             Value::UInt(u) => Ok(u as f64),
             other => Err(Error::CelEval(format!(
-                "Expected float result, got {:?}", other
+                "Expected float result, got {:?}",
+                other
             ))),
         }
     }
@@ -104,7 +108,8 @@ impl CelCompiler {
         match result {
             Value::String(s) => Ok(s.to_string()),
             other => Err(Error::CelEval(format!(
-                "Expected string result, got {:?}", other
+                "Expected string result, got {:?}",
+                other
             ))),
         }
     }
@@ -194,7 +199,8 @@ impl CelCompiler {
         for var in &referenced {
             if !valid_set.contains(var.as_str()) {
                 return Err(Error::CelParse(format!(
-                    "Undefined variable '{}' in expression: {}", var, expr
+                    "Undefined variable '{}' in expression: {}",
+                    var, expr
                 )));
             }
         }
@@ -262,7 +268,9 @@ impl CelCompiler {
                 format!("({} {} {})", l, op_str, r)
             }
 
-            CelExpr::Relation(left, op, right) => Self::render_relation(op.clone(), left, right, target),
+            CelExpr::Relation(left, op, right) => {
+                Self::render_relation(op.clone(), left, right, target)
+            }
 
             CelExpr::Unary(op, inner) => {
                 let inner_str = Self::render(inner, target);
@@ -346,7 +354,9 @@ impl CelCompiler {
             },
             Atom::Null => match target {
                 Target::Python => "None".to_string(),
-                Target::TypeScript | Target::CSharp | Target::Java | Target::Go => "null".to_string(),
+                Target::TypeScript | Target::CSharp | Target::Java | Target::Go => {
+                    "null".to_string()
+                }
                 Target::Rust => "None".to_string(),
             },
         }
@@ -468,7 +478,10 @@ impl CelCompiler {
                 format!("{}.startsWith({})", args_rendered[0], args_rendered[1])
             }
             ("startsWith", Target::Go) => {
-                format!("strings.HasPrefix({}, {})", args_rendered[0], args_rendered[1])
+                format!(
+                    "strings.HasPrefix({}, {})",
+                    args_rendered[0], args_rendered[1]
+                )
             }
             ("endsWith", Target::Rust) => {
                 format!("{}.ends_with({})", args_rendered[0], args_rendered[1])
@@ -480,7 +493,10 @@ impl CelCompiler {
                 format!("{}.endsWith({})", args_rendered[0], args_rendered[1])
             }
             ("endsWith", Target::Go) => {
-                format!("strings.HasSuffix({}, {})", args_rendered[0], args_rendered[1])
+                format!(
+                    "strings.HasSuffix({}, {})",
+                    args_rendered[0], args_rendered[1]
+                )
             }
             ("matches", Target::Rust) => {
                 format!(
@@ -501,7 +517,10 @@ impl CelCompiler {
                 format!("{}.matches({})", args_rendered[0], args_rendered[1])
             }
             ("matches", Target::Go) => {
-                format!("regexp.MatchString({}, {})", args_rendered[1], args_rendered[0])
+                format!(
+                    "regexp.MatchString({}, {})",
+                    args_rendered[1], args_rendered[0]
+                )
             }
 
             // int/float conversion
@@ -515,7 +534,9 @@ impl CelCompiler {
             ("double" | "float", Target::Rust) => format!("{} as f64", args_rendered[0]),
             ("double" | "float", Target::TypeScript) => format!("parseFloat({})", args_rendered[0]),
             ("double" | "float", Target::Python) => format!("float({})", args_rendered[0]),
-            ("double" | "float", Target::CSharp | Target::Java) => format!("(double){}", args_rendered[0]),
+            ("double" | "float", Target::CSharp | Target::Java) => {
+                format!("(double){}", args_rendered[0])
+            }
             ("double" | "float", Target::Go) => format!("float64({})", args_rendered[0]),
 
             // string conversion
@@ -570,8 +591,14 @@ impl CelCompiler {
             Target::TypeScript => format!("{}.map({} => {})", list, var, trans),
             Target::Python => format!("[{} for {} in {}]", trans, var, list),
             Target::CSharp => format!("{}.Select({} => {}).ToList()", list, var, trans),
-            Target::Java => format!("{}.stream().map({} -> {}).collect(Collectors.toList())", list, var, trans),
-            Target::Go => format!("mapSlice({}, func({} T) R {{ return {} }})", list, var, trans),
+            Target::Java => format!(
+                "{}.stream().map({} -> {}).collect(Collectors.toList())",
+                list, var, trans
+            ),
+            Target::Go => format!(
+                "mapSlice({}, func({} T) R {{ return {} }})",
+                list, var, trans
+            ),
         }
     }
 
@@ -586,8 +613,14 @@ impl CelCompiler {
             Target::TypeScript => format!("{}.filter({} => {})", list, var, pred),
             Target::Python => format!("[{} for {} in {} if {}]", var, var, list, pred),
             Target::CSharp => format!("{}.Where({} => {}).ToList()", list, var, pred),
-            Target::Java => format!("{}.stream().filter({} -> {}).collect(Collectors.toList())", list, var, pred),
-            Target::Go => format!("filter({}, func({} T) bool {{ return {} }})", list, var, pred),
+            Target::Java => format!(
+                "{}.stream().filter({} -> {}).collect(Collectors.toList())",
+                list, var, pred
+            ),
+            Target::Go => format!(
+                "filter({}, func({} T) bool {{ return {} }})",
+                list, var, pred
+            ),
         }
     }
 }
@@ -759,18 +792,14 @@ mod tests {
         vars.insert("level".to_string(), Value::Int(50));
 
         // role == "member" && verified && level >= 50
-        let result = CelCompiler::eval_bool(
-            "role == \"member\" && verified && level >= 50",
-            &vars
-        ).unwrap();
+        let result =
+            CelCompiler::eval_bool("role == \"member\" && verified && level >= 50", &vars).unwrap();
         assert!(result);
 
         // Change one condition
         vars.insert("verified".to_string(), Value::Bool(false));
-        let result = CelCompiler::eval_bool(
-            "role == \"member\" && verified && level >= 50",
-            &vars
-        ).unwrap();
+        let result =
+            CelCompiler::eval_bool("role == \"member\" && verified && level >= 50", &vars).unwrap();
         assert!(!result);
     }
 }

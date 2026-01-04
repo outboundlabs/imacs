@@ -406,13 +406,13 @@ fn all_specs_round_trip() {
 | Priority | Task | Status |
 |----------|------|--------|
 | 🔴 HIGH | Add CEL type inference/validation | ✅ DONE (PY-4: `CelCompiler::validate_variables()`) |
-| 🔴 HIGH | Add Orchestrator complexity lint rules | 🔲 TODO |
+| 🔴 HIGH | Add Orchestrator complexity lint rules | ✅ DONE (FM-2: `analyze_complexity()`) |
 | 🟡 MED | Add exhaustiveness checking for Specs | ✅ DONE (PY-2: Warning when no default rule) |
-| 🟡 MED | Consolidate translate_vars functions | 🔲 TODO |
+| 🟡 MED | Consolidate translate_vars functions | ✅ DONE (`translate_vars()` with `VarTranslation` enum) |
 | 🟡 MED | Add Orchestrator step ID uniqueness check | ✅ DONE (PY-3: In `Orchestrator::validate()`) |
-| 🟢 LOW | Add TypeScript formatter (prettier) | 🔲 TODO |
-| 🟢 LOW | Add Python formatter (black/ruff) | 🔲 TODO |
-| 🟢 LOW | Document Spec vs Orchestrator guidelines | 🔲 TODO |
+| 🟢 LOW | Add TypeScript formatter (prettier) | ✅ DONE (`format_typescript()` with fallback) |
+| 🟢 LOW | Add Python formatter (black/ruff) | ✅ DONE (`format_python()` with fallback) |
+| 🟢 LOW | Document Spec vs Orchestrator guidelines | ✅ DONE (In `lib.rs` module docs) |
 
 ---
 
@@ -428,6 +428,90 @@ fn all_specs_round_trip() {
 | Add PY-4: CEL variable extraction/validation | ✅ |
 
 **Test Results:** 76 tests passing
+
+---
+
+## Refactoring Session (2026-01-02 Part 2)
+
+### Completed Tasks
+
+| Task | Status | Details |
+|------|--------|---------|
+| Fix compilation errors in refactor.rs | ✅ | Fixed struct field mismatches (LoopStep.steps, TryStep.catch/finally) |
+| Add Orchestrator complexity lint rules (FM-2) | ✅ | `analyze_complexity()` returns `ComplexityReport` |
+| Consolidate translate_vars functions (FM-4) | ✅ | Single `translate_vars()` with `VarTranslation` enum |
+
+### New APIs Added
+
+```rust
+// Orchestrator complexity analysis (FM-2 mitigation)
+pub struct ComplexityReport {
+    pub step_count: usize,
+    pub cyclomatic_complexity: usize,
+    pub warnings: Vec<String>,
+}
+
+impl Orchestrator {
+    pub fn analyze_complexity(&self) -> ComplexityReport;
+}
+
+pub fn count_steps(steps: &[ChainStep]) -> usize;
+pub fn calculate_complexity(steps: &[ChainStep]) -> usize;
+```
+
+```rust
+// Consolidated variable translation (FM-4 mitigation)
+pub enum VarTranslation {
+    CamelCase,      // TypeScript, C#
+    InputPascal,    // Go: input.PascalCase
+    InputCamel,     // Java: input.camelCase
+}
+
+pub fn translate_vars(expr: &str, input_names: &[String], mode: VarTranslation) -> String;
+```
+
+### Complexity Lint Rules (FM-2)
+
+1. **Step count warning**: Flag orchestrators with >10 steps
+2. **Cyclomatic complexity warning**: Flag orchestrators with complexity >10
+3. **Spec-less control flow warning**: Warn when Branch/Loop/ForEach contains no spec calls
+
+**Test Results:** 120 tests passing
+
+---
+
+## Refactoring Session (2026-01-03)
+
+### Completed Tasks
+
+| Task | Status | Details |
+|------|--------|---------|
+| Add TypeScript formatter | ✅ | `format_typescript()` - uses prettier with fallback |
+| Add Python formatter | ✅ | `format_python()` - uses black/ruff with fallback |
+| Add Go formatter | ✅ | `format_go()` - uses gofmt with fallback |
+| Document Spec vs Orchestrator guidelines | ✅ | Added to `lib.rs` module documentation |
+
+### New Format APIs
+
+```rust
+// External formatters with graceful fallback
+pub fn format_typescript(code: &str) -> Result<String, FormatError>;  // prettier
+pub fn format_python(code: &str) -> Result<String, FormatError>;      // black/ruff
+pub fn format_go(code: &str) -> Result<String, FormatError>;          // gofmt
+
+// Formatter availability checking
+pub fn is_formatter_available(formatter: &str) -> bool;
+pub fn available_formatters() -> Vec<(&'static str, &'static str)>;
+```
+
+### Formatter Fallback Strategy
+
+All external formatters gracefully degrade:
+1. Try primary formatter (prettier, black, gofmt)
+2. Try alternative (npx prettier, ruff)
+3. Return original code if no formatter available
+
+**Test Results:** 124 tests passing
 
 ---
 

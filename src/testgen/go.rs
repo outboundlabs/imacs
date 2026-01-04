@@ -22,10 +22,18 @@ pub fn generate(spec: &Spec, _config: &TestConfig) -> String {
         let expected = go_value(&rule.then);
 
         out.push_str(&format!("func {}(t *testing.T) {{\n", test_name));
-        out.push_str(&format!("\t// {}: {} → {}\n", rule.id, rule.as_cel().unwrap_or_default(), rule.then));
+        out.push_str(&format!(
+            "\t// {}: {} → {}\n",
+            rule.id,
+            rule.as_cel().unwrap_or_default(),
+            rule.then
+        ));
         out.push_str(&format!("\tresult := {}(/* input */)\n", func_name));
         out.push_str(&format!("\tif result != {} {{\n", expected));
-        out.push_str(&format!("\t\tt.Errorf(\"Expected {}, got %v\", result)\n", expected));
+        out.push_str(&format!(
+            "\t\tt.Errorf(\"Expected {}, got %v\", result)\n",
+            expected
+        ));
         out.push_str("\t}\n");
         out.push_str("}\n\n");
     }

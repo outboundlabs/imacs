@@ -31,17 +31,17 @@
 //! // Result should be: A + B (two terms instead of three)
 //! ```
 
-pub mod cube;
 pub mod cover;
-pub mod pla;
-pub mod minimize;
+pub mod cube;
 pub mod error;
+pub mod minimize;
+pub mod pla;
 
-pub use cube::{Cube, CubeValue};
 pub use cover::Cover;
-pub use pla::Pla;
-pub use minimize::{espresso, EspressoOptions};
+pub use cube::{Cube, CubeValue};
 pub use error::EspressoError;
+pub use minimize::{espresso, EspressoOptions};
+pub use pla::Pla;
 
 /// Result type for espresso operations
 pub type Result<T> = std::result::Result<T, EspressoError>;

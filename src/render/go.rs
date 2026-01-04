@@ -1,4 +1,5 @@
 //! Go code generation using genco
+#![allow(for_loops_over_fallibles)]
 
 use crate::cel::{CelCompiler, Target};
 use crate::spec::*;
@@ -7,21 +8,16 @@ use genco::prelude::*;
 
 use super::{is_expression, to_pascal_case, RenderConfig};
 
-/// Translate snake_case variables to input.PascalCase for Go
-fn translate_vars_for_go(expr: &str, input_names: &[String]) -> String {
-    let mut result = expr.to_string();
-    for name in input_names {
-        let pascal = to_pascal_case(name);
-        let replacement = format!("input.{}", pascal);
-        result = result.replace(name.as_str(), &replacement);
-    }
-    result
-}
+use super::{translate_vars, VarTranslation};
 
 /// Render spec to Go code
 pub fn render(spec: &Spec, config: &RenderConfig) -> String {
     let input_names: Vec<String> = spec.inputs.iter().map(|i| i.name.clone()).collect();
-    let tokens = GoRenderer { config, input_names }.render(spec);
+    let tokens = GoRenderer {
+        config,
+        input_names,
+    }
+    .render(spec);
     tokens.to_file_string().unwrap_or_default()
 }
 
@@ -73,8 +69,9 @@ impl<'a> GoRenderer<'a> {
             let condition = rule
                 .as_cel()
                 .map(|cel| {
-                    let compiled = CelCompiler::compile(&cel, Target::Go).unwrap_or_else(|_| cel.clone());
-                    translate_vars_for_go(&compiled, &self.input_names)
+                    let compiled =
+                        CelCompiler::compile(&cel, Target::Go).unwrap_or_else(|_| cel.clone());
+                    translate_vars(&compiled, &self.input_names, VarTranslation::InputPascal)
                 })
                 .unwrap_or_else(|| "true".into());
 
@@ -150,7 +147,7 @@ impl<'a> GoRenderer<'a> {
                 if is_expression(s) {
                     // Compile as CEL expression and translate variable names
                     let compiled = CelCompiler::compile(s, Target::Go)
-                        .map(|c| translate_vars_for_go(&c, &self.input_names))
+                        .map(|c| translate_vars(&c, &self.input_names, VarTranslation::InputPascal))
                         .unwrap_or_else(|_| format!("\"{}\"", s));
                     quote!($compiled)
                 } else {
@@ -172,7 +169,7 @@ impl<'a> GoRenderer<'a> {
                 if is_expression(s) {
                     // Compile as CEL expression and translate variable names
                     CelCompiler::compile(s, Target::Go)
-                        .map(|c| translate_vars_for_go(&c, &self.input_names))
+                        .map(|c| translate_vars(&c, &self.input_names, VarTranslation::InputPascal))
                         .unwrap_or_else(|_| format!("\"{}\"", s))
                 } else {
                     format!("\"{}\"", s)

@@ -110,6 +110,51 @@
 //! │                                                             │
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
+//!
+//! ## Spec vs Orchestrator Guidelines
+//!
+//! IMACS uses two logic types with distinct purposes:
+//!
+//! | Type | Structure | Use Case | Verifiability |
+//! |------|-----------|----------|---------------|
+//! | **Spec** | Decision table (pure functions) | Business rules, validation | ✓ Complete |
+//! | **Orchestrator** | Workflow (control flow) | Process coordination | Partial |
+//!
+//! ### When to Use Specs
+//!
+//! Use a **Spec** when the logic:
+//! - Is a pure function (same inputs → same outputs)
+//! - Can be expressed as if/else or match rules
+//! - Has a finite, enumerable input space
+//! - Needs verification and test generation
+//!
+//! **Good Spec examples:**
+//! - Status code determination based on conditions
+//! - Pricing tier selection
+//! - Permission checks
+//! - Validation rules
+//!
+//! ### When to Use Orchestrators
+//!
+//! Use an **Orchestrator** when the logic:
+//! - Coordinates multiple Spec calls
+//! - Requires sequential/parallel execution
+//! - Involves I/O, side effects, or external services
+//! - Needs error handling, retries, or timeouts
+//!
+//! **Good Orchestrator examples:**
+//! - Order processing workflow
+//! - Multi-step validation pipeline
+//! - Data transformation chain
+//!
+//! ### Anti-Patterns to Avoid
+//!
+//! 1. **Business logic in Orchestrators**: Put decision logic in Specs, not Compute steps
+//! 2. **Orchestrator loops for rules**: Use Spec rules instead of Loop/Branch for decisions
+//! 3. **Specs with I/O**: Specs should be pure; use Orchestrators for external calls
+//! 4. **Skipping Specs**: Every Branch/Loop should eventually call a Spec
+//!
+//! Use `Orchestrator::analyze_complexity()` to detect complexity warnings.
 
 // Core modules (Layer 0: hand-crafted bootstrap)
 pub mod ast;
@@ -142,32 +187,69 @@ pub use analyze::{analyze, AnalysisReport, Analyzer, FunctionMetrics, Issue, Sev
 pub use ast::{
     AstNode, BinaryOp, CodeAst, Function, LiteralValue, MatchArm, Pattern, Span, UnaryOp,
 };
+pub use cel::Target;
 pub use cel::{CelCompiler, CelExpr};
 pub use drift::{compare, Difference, DriftDetector, DriftReport, DriftStatus};
 pub use error::{Error, Result};
 pub use extract::{extract, Confidence, ExtractedSpec, Extractor};
 pub use parse::parse_rust;
-pub use cel::Target;
 pub use render::{render, Renderer};
 pub use spec::{Condition, ConditionOp, ConditionValue, Output, Rule, Spec, VarType, Variable};
 pub use testgen::{generate_tests, TestConfig, TestGenerator, TestMode};
 pub use verify::{verify, Coverage, CoverageGap, VerificationResult, Verifier};
 
 // Code formatting
-pub use format::{format_code, format_rust, FormatError};
+pub use format::{
+    available_formatters, format_code, format_go, format_python, format_rust, format_typescript,
+    is_formatter_available, FormatError,
+};
 
 // Completeness analysis
 pub use completeness::{
-    analyze_completeness, extract_predicates, IncompletenessReport, MissingCase,
-    Predicate, PredicateInfo, PredicateSet, PredicateValue, RuleOverlap,
+    analyze_completeness,
+    compose,
+    cover_to_cel,
+    cube_to_cel,
+    decompose,
+    espresso_minimize,
+    expression_to_cube,
+    extract_predicates,
+    extract_spec_from_orchestrator,
+    // Refactoring APIs
+    minimize,
+    minimize_rules,
+    rules_to_cover,
+    ChainDefinition,
+    ComparisonOp,
+    ComposedSpec,
     // Espresso integration
-    Cover, Cube, CubeValue, espresso_minimize, EspressoOptions,
-    rules_to_cover, expression_to_cube, cover_to_cel, cube_to_cel, minimize_rules,
+    Cover,
+    Cube,
+    CubeValue,
+    DecompositionResult,
+    EspressoOptions,
+    IncompletenessReport,
+    MinimizedSpec,
+    MissingCase,
+    OrchestratorExtractionResult,
+    OutputToInputMapping,
+    Predicate,
+    PredicateInfo,
+    PredicateSet,
+    PredicateValue,
+    RuleOverlap,
+    StringOpKind,
+    Transformation,
+    TransformationKind,
+    VariableGroup,
 };
+// Re-export predicate LiteralValue under a distinct name to avoid conflict with ast::LiteralValue
+pub use completeness::LiteralValue as PredicateLiteralValue;
 
 // Orchestration
 pub use orchestrate::{
-    render_orchestrator, ChainStep, Orchestrator, OrchestratorInput, OrchestratorOutput,
+    calculate_complexity, count_steps, render_orchestrator, ChainStep, ComplexityReport,
+    Orchestrator, OrchestratorInput, OrchestratorOutput,
 };
 pub use testgen_orchestrate::{
     generate_orchestrator_tests, verify_orchestrator, OrchestratorTests, OrchestratorVerification,

@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A complete specification
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[schemars(title = "IMACS Spec", description = "Decision table specification")]
 pub struct Spec {
     /// Unique identifier (used as function name)
@@ -98,21 +98,17 @@ pub struct Variable {
 /// Variable types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum VarType {
     Bool,
     Int,
     Float,
+    #[default]
     String,
     #[serde(rename = "enum")]
     Enum(Vec<String>),
     List(Box<VarType>),
     Object,
-}
-
-impl Default for VarType {
-    fn default() -> Self {
-        VarType::String
-    }
 }
 
 /// A decision rule

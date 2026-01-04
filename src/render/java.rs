@@ -1,4 +1,5 @@
 //! Java code generation using genco
+#![allow(for_loops_over_fallibles)]
 
 use crate::cel::{CelCompiler, Target};
 use crate::spec::*;
@@ -7,21 +8,16 @@ use genco::prelude::*;
 
 use super::{is_expression, to_camel_case, to_pascal_case, RenderConfig};
 
-/// Convert snake_case identifiers to input.camelCase for Java
-fn translate_vars_for_java(expr: &str, input_names: &[String]) -> String {
-    let mut result = expr.to_string();
-    for name in input_names {
-        let camel = to_camel_case(name);
-        let replacement = format!("input.{}", camel);
-        result = result.replace(name.as_str(), &replacement);
-    }
-    result
-}
+use super::{translate_vars, VarTranslation};
 
 /// Render spec to Java code
 pub fn render(spec: &Spec, config: &RenderConfig) -> String {
     let input_names: Vec<String> = spec.inputs.iter().map(|i| i.name.clone()).collect();
-    let tokens = JavaRenderer { config, input_names }.render(spec);
+    let tokens = JavaRenderer {
+        config,
+        input_names,
+    }
+    .render(spec);
     tokens.to_file_string().unwrap_or_default()
 }
 
@@ -72,8 +68,9 @@ impl<'a> JavaRenderer<'a> {
             let condition = rule
                 .as_cel()
                 .map(|cel| {
-                    let compiled = CelCompiler::compile(&cel, Target::Java).unwrap_or_else(|_| cel.clone());
-                    translate_vars_for_java(&compiled, &self.input_names)
+                    let compiled =
+                        CelCompiler::compile(&cel, Target::Java).unwrap_or_else(|_| cel.clone());
+                    translate_vars(&compiled, &self.input_names, VarTranslation::InputCamel)
                 })
                 .unwrap_or_else(|| "true".into());
 
@@ -149,7 +146,7 @@ impl<'a> JavaRenderer<'a> {
                 if is_expression(s) {
                     // Compile as CEL expression and translate variable names
                     let compiled = CelCompiler::compile(s, Target::Java)
-                        .map(|c| translate_vars_for_java(&c, &self.input_names))
+                        .map(|c| translate_vars(&c, &self.input_names, VarTranslation::InputCamel))
                         .unwrap_or_else(|_| format!("\"{}\"", s));
                     quote!($compiled)
                 } else {
@@ -171,7 +168,7 @@ impl<'a> JavaRenderer<'a> {
                 if is_expression(s) {
                     // Compile as CEL expression and translate variable names
                     CelCompiler::compile(s, Target::Java)
-                        .map(|c| translate_vars_for_java(&c, &self.input_names))
+                        .map(|c| translate_vars(&c, &self.input_names, VarTranslation::InputCamel))
                         .unwrap_or_else(|_| format!("\"{}\"", s))
                 } else {
                     format!("\"{}\"", s)

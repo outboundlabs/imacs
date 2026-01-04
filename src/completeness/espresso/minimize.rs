@@ -201,7 +201,7 @@ impl EspressoMinimizer {
     }
 
     /// Expand a single cube as much as possible without intersecting OFF-set
-    fn expand_cube(&self, cube: &Cube, existing: &[Cube]) -> Cube {
+    fn expand_cube(&self, cube: &Cube, _existing: &[Cube]) -> Cube {
         let mut expanded = cube.clone();
 
         // Try expanding each variable to don't care
@@ -281,7 +281,7 @@ impl EspressoMinimizer {
 
         for i in 0..self.cover.len() {
             let cube = self.cover.get(i).unwrap().clone();
-            
+
             // Try to reduce this cube
             let reduced = self.reduce_cube(&cube, i);
             new_cover.add(reduced);
@@ -349,7 +349,7 @@ pub fn simplify(cover: &mut Cover) {
 pub fn exact_minimize(on_set: &Cover, dc_set: &Cover) -> Cover {
     // First get all prime implicants
     let primes = find_prime_implicants(on_set, dc_set);
-    
+
     // Then find minimum cover
     minimum_cover(&primes, on_set)
 }
@@ -358,7 +358,7 @@ pub fn exact_minimize(on_set: &Cover, dc_set: &Cover) -> Cover {
 fn find_prime_implicants(on_set: &Cover, dc_set: &Cover) -> Cover {
     let combined = on_set.union(dc_set);
     let mut primes = combined.clone();
-    
+
     // Iteratively merge until no more merges possible
     let mut changed = true;
     while changed {
@@ -449,13 +449,13 @@ mod tests {
         // Function: AB' + A'B + AB = A + B
         let mut on_set = Cover::new(2, 1);
         on_set.add(make_cube("10")); // AB'
-        on_set.add(make_cube("01")); // A'B  
+        on_set.add(make_cube("01")); // A'B
         on_set.add(make_cube("11")); // AB
 
         let dc_set = Cover::new(2, 1);
 
         let result = espresso(&on_set, &dc_set);
-        
+
         // Should minimize to 2 terms: A + B (or 1- + -1)
         assert!(result.len() <= 2);
     }
@@ -472,7 +472,7 @@ mod tests {
         dc_set.add(make_cube("11")); // 11 is don't care
 
         let result = espresso(&on_set, &dc_set);
-        
+
         // Should minimize to single tautology term (all 1s with dc)
         assert!(result.len() <= 2);
     }
@@ -488,7 +488,7 @@ mod tests {
         let dc_set = Cover::new(3, 1);
 
         let result = espresso(&on_set, &dc_set);
-        
+
         // Should recognize pattern: A (1--)
         assert_eq!(result.len(), 1);
         let cube = result.get(0).unwrap();
@@ -507,7 +507,7 @@ mod tests {
         let dc_set = Cover::new(2, 1);
 
         let result = espresso(&on_set, &dc_set);
-        
+
         // Should remove redundant cube
         assert_eq!(result.len(), 1);
     }
@@ -534,7 +534,7 @@ mod tests {
         }
 
         let result = espresso(&on_set, &dc_set);
-        
+
         // Should produce a reasonable minimization
         assert!(result.len() < 8);
     }

@@ -39,7 +39,11 @@ impl<'a> RustRenderer<'a> {
 
         let return_type = if spec.outputs.len() > 1 {
             // Multiple outputs -> tuple
-            let types: Vec<_> = spec.outputs.iter().map(|v| self.render_type(&v.typ)).collect();
+            let types: Vec<_> = spec
+                .outputs
+                .iter()
+                .map(|v| self.render_type(&v.typ))
+                .collect();
             format!("({})", types.join(", "))
         } else {
             spec.outputs
@@ -146,15 +150,28 @@ impl<'a> RustRenderer<'a> {
                 out.push_str(&format!("{}{}// {}\n", ind, ind, rule.id));
             }
 
-            out.push_str(&format!("{}{}{}\n", ind, ind, self.render_output_for_spec(&rule.then, spec)));
+            out.push_str(&format!(
+                "{}{}{}\n",
+                ind,
+                ind,
+                self.render_output_for_spec(&rule.then, spec)
+            ));
         }
 
         // Default/else - always add one
         out.push_str(&format!("{}}} else {{\n", ind));
         if let Some(default) = &spec.default {
-            out.push_str(&format!("{}{}{}\n", ind, ind, self.render_output_for_spec(default, spec)));
+            out.push_str(&format!(
+                "{}{}{}\n",
+                ind,
+                ind,
+                self.render_output_for_spec(default, spec)
+            ));
         } else {
-            out.push_str(&format!("{}{}unreachable!(\"No rule matched\")\n", ind, ind));
+            out.push_str(&format!(
+                "{}{}unreachable!(\"No rule matched\")\n",
+                ind, ind
+            ));
         }
 
         out.push_str(&format!("{}}}\n", ind));
@@ -212,9 +229,7 @@ impl<'a> RustRenderer<'a> {
             Output::Named(map) => {
                 let fields: Vec<_> = map
                     .iter()
-                    .map(|(k, v)| {
-                        format!("{}: {}", k, self.render_condition_value(v))
-                    })
+                    .map(|(k, v)| format!("{}: {}", k, self.render_condition_value(v)))
                     .collect();
                 format!("{{ {} }}", fields.join(", "))
             }
@@ -259,7 +274,9 @@ impl<'a> RustRenderer<'a> {
         let map = map.unwrap();
         if spec.outputs.len() > 1 {
             // Multiple outputs -> tuple in spec output order
-            let values: Vec<_> = spec.outputs.iter()
+            let values: Vec<_> = spec
+                .outputs
+                .iter()
                 .map(|out_var| {
                     map.get(&out_var.name)
                         .map(|v| self.render_condition_value(v))

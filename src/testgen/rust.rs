@@ -58,16 +58,21 @@ impl<'a> RustTestGen<'a> {
 
         // Exhaustive tests
         if self.config.exhaustive && can_enumerate(spec) {
-            out.push_str("    // ═══════════════════════════════════════════════════════════════\n");
+            out.push_str(
+                "    // ═══════════════════════════════════════════════════════════════\n",
+            );
             out.push_str("    // Exhaustive tests (all input combinations)\n");
-            out.push_str("    // ═══════════════════════════════════════════════════════════════\n\n");
+            out.push_str(
+                "    // ═══════════════════════════════════════════════════════════════\n\n",
+            );
 
             out.push_str("    #[test]\n");
             out.push_str("    fn test_exhaustive() {\n");
 
             let combinations = generate_combinations(spec);
             for (inputs, rule_id, expected) in combinations {
-                let input_str = inputs.iter()
+                let input_str = inputs
+                    .iter()
                     .map(|v| self.to_rust_value(v))
                     .collect::<Vec<_>>()
                     .join(", ");
@@ -82,9 +87,13 @@ impl<'a> RustTestGen<'a> {
 
         // Boundary tests
         if self.config.boundary && has_numeric_conditions(spec) {
-            out.push_str("    // ═══════════════════════════════════════════════════════════════\n");
+            out.push_str(
+                "    // ═══════════════════════════════════════════════════════════════\n",
+            );
             out.push_str("    // Boundary tests\n");
-            out.push_str("    // ═══════════════════════════════════════════════════════════════\n\n");
+            out.push_str(
+                "    // ═══════════════════════════════════════════════════════════════\n\n",
+            );
 
             let boundary_tests = self.generate_boundary_tests(spec);
             for (name, tests) in boundary_tests {
@@ -102,9 +111,13 @@ impl<'a> RustTestGen<'a> {
 
         // Property tests
         if self.config.property {
-            out.push_str("    // ═══════════════════════════════════════════════════════════════\n");
+            out.push_str(
+                "    // ═══════════════════════════════════════════════════════════════\n",
+            );
             out.push_str("    // Property tests\n");
-            out.push_str("    // ═══════════════════════════════════════════════════════════════\n\n");
+            out.push_str(
+                "    // ═══════════════════════════════════════════════════════════════\n\n",
+            );
 
             out.push_str("    #[cfg(feature = \"proptest\")]\n");
             out.push_str("    mod property_tests {\n");
@@ -174,7 +187,9 @@ impl<'a> RustTestGen<'a> {
         };
 
         if spec.outputs.len() > 1 {
-            let values: Vec<_> = spec.outputs.iter()
+            let values: Vec<_> = spec
+                .outputs
+                .iter()
                 .map(|out_var| {
                     map.get(&out_var.name)
                         .map(|v| self.rust_condition_value(v))
@@ -215,6 +230,7 @@ impl<'a> RustTestGen<'a> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn generate_boundary_tests(&self, spec: &Spec) -> Vec<(String, Vec<(String, String, String)>)> {
         let mut results = Vec::new();
 
@@ -227,11 +243,19 @@ impl<'a> RustTestGen<'a> {
                                 results.push((
                                     format!("{}_{}", cond.var, threshold),
                                     vec![
-                                        (threshold.to_string(), "/*below*/".into(), format!("at threshold {}", threshold)),
-                                        ((threshold + 1).to_string(), self.rust_condition_value(&match &rule.then {
-                                            Output::Single(v) => v.clone(),
-                                            _ => ConditionValue::Int(0),
-                                        }), format!("above threshold {}", threshold)),
+                                        (
+                                            threshold.to_string(),
+                                            "/*below*/".into(),
+                                            format!("at threshold {}", threshold),
+                                        ),
+                                        (
+                                            (threshold + 1).to_string(),
+                                            self.rust_condition_value(&match &rule.then {
+                                                Output::Single(v) => v.clone(),
+                                                _ => ConditionValue::Int(0),
+                                            }),
+                                            format!("above threshold {}", threshold),
+                                        ),
                                     ],
                                 ));
                             }
@@ -239,11 +263,19 @@ impl<'a> RustTestGen<'a> {
                                 results.push((
                                     format!("{}_{}", cond.var, threshold),
                                     vec![
-                                        ((threshold - 1).to_string(), self.rust_condition_value(&match &rule.then {
-                                            Output::Single(v) => v.clone(),
-                                            _ => ConditionValue::Int(0),
-                                        }), format!("below threshold {}", threshold)),
-                                        (threshold.to_string(), "/*at or above*/".into(), format!("at threshold {}", threshold)),
+                                        (
+                                            (threshold - 1).to_string(),
+                                            self.rust_condition_value(&match &rule.then {
+                                                Output::Single(v) => v.clone(),
+                                                _ => ConditionValue::Int(0),
+                                            }),
+                                            format!("below threshold {}", threshold),
+                                        ),
+                                        (
+                                            threshold.to_string(),
+                                            "/*at or above*/".into(),
+                                            format!("at threshold {}", threshold),
+                                        ),
                                     ],
                                 ));
                             }

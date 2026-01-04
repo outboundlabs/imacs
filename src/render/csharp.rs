@@ -1,4 +1,5 @@
 //! C# code generation using genco
+#![allow(for_loops_over_fallibles)]
 
 use crate::cel::{CelCompiler, Target};
 use crate::spec::*;
@@ -7,22 +8,16 @@ use genco::prelude::*;
 
 use super::{is_expression, to_camel_case, to_pascal_case, RenderConfig};
 
-/// Convert snake_case identifiers to camelCase in a compiled expression
-fn translate_vars_to_camel_case(expr: &str, input_names: &[String]) -> String {
-    let mut result = expr.to_string();
-    for name in input_names {
-        if name.contains('_') {
-            let camel = to_camel_case(name);
-            result = result.replace(name.as_str(), &camel);
-        }
-    }
-    result
-}
+use super::{translate_vars, VarTranslation};
 
 /// Render spec to C# code
 pub fn render(spec: &Spec, config: &RenderConfig) -> String {
     let input_names: Vec<String> = spec.inputs.iter().map(|i| i.name.clone()).collect();
-    let tokens = CSharpRenderer { config, input_names }.render(spec);
+    let tokens = CSharpRenderer {
+        config,
+        input_names,
+    }
+    .render(spec);
     tokens.to_file_string().unwrap_or_default()
 }
 
@@ -85,8 +80,9 @@ impl<'a> CSharpRenderer<'a> {
             let condition = rule
                 .as_cel()
                 .map(|cel| {
-                    let compiled = CelCompiler::compile(&cel, Target::CSharp).unwrap_or_else(|_| cel.clone());
-                    translate_vars_to_camel_case(&compiled, &self.input_names)
+                    let compiled =
+                        CelCompiler::compile(&cel, Target::CSharp).unwrap_or_else(|_| cel.clone());
+                    translate_vars(&compiled, &self.input_names, VarTranslation::CamelCase)
                 })
                 .unwrap_or_else(|| "true".into());
 
@@ -148,7 +144,9 @@ impl<'a> CSharpRenderer<'a> {
             Output::Named(map) => {
                 let fields: Vec<_> = map
                     .iter()
-                    .map(|(k, v)| format!("{} = {}", to_pascal_case(k), self.render_value_string(v)))
+                    .map(|(k, v)| {
+                        format!("{} = {}", to_pascal_case(k), self.render_value_string(v))
+                    })
                     .collect();
                 quote!(new { $(fields.join(", ")) })
             }
@@ -165,7 +163,7 @@ impl<'a> CSharpRenderer<'a> {
                 if is_expression(s) {
                     // Compile as CEL expression and translate variable names
                     let compiled = CelCompiler::compile(s, Target::CSharp)
-                        .map(|c| translate_vars_to_camel_case(&c, &self.input_names))
+                        .map(|c| translate_vars(&c, &self.input_names, VarTranslation::CamelCase))
                         .unwrap_or_else(|_| format!("\"{}\"", s));
                     quote!($compiled)
                 } else {
@@ -187,7 +185,7 @@ impl<'a> CSharpRenderer<'a> {
                 if is_expression(s) {
                     // Compile as CEL expression and translate variable names
                     CelCompiler::compile(s, Target::CSharp)
-                        .map(|c| translate_vars_to_camel_case(&c, &self.input_names))
+                        .map(|c| translate_vars(&c, &self.input_names, VarTranslation::CamelCase))
                         .unwrap_or_else(|_| format!("\"{}\"", s))
                 } else {
                     format!("\"{}\"", s)

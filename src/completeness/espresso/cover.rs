@@ -319,9 +319,9 @@ impl Cover {
         let mut found_valid = false;
 
         for var in 0..self.num_inputs {
-            let mut pos_count = 0;  // Count cubes with explicit 1
-            let mut neg_count = 0;  // Count cubes with explicit 0
-            let mut dc_count = 0;   // Count cubes with don't care
+            let mut pos_count = 0; // Count cubes with explicit 1
+            let mut neg_count = 0; // Count cubes with explicit 0
+            let mut dc_count = 0; // Count cubes with don't care
 
             for cube in &self.cubes {
                 match cube.input(var) {
@@ -406,7 +406,8 @@ impl Cover {
 
     /// Sort cubes by number of literals (most literals first, for reduce)
     pub fn sort_by_size_desc(&mut self) {
-        self.cubes.sort_by_key(|c| std::cmp::Reverse(c.literal_count()));
+        self.cubes
+            .sort_by_key(|c| std::cmp::Reverse(c.literal_count()));
     }
 }
 
@@ -446,7 +447,7 @@ mod tests {
         let mut cover = Cover::new(2, 1);
         cover.add(Cube::from_str("10", "1").unwrap());
         cover.add(Cube::from_str("01", "1").unwrap());
-        
+
         assert_eq!(cover.len(), 2);
         assert_eq!(cover.num_inputs(), 2);
         assert_eq!(cover.num_outputs(), 1);
@@ -457,9 +458,9 @@ mod tests {
         let mut cover = Cover::new(2, 1);
         cover.add(Cube::from_str("10", "1").unwrap());
         cover.add(Cube::from_str("11", "1").unwrap());
-        
+
         cover.distance_1_merge();
-        
+
         assert_eq!(cover.len(), 1);
         assert_eq!(cover.get(0).unwrap().input(0), CubeValue::One);
         assert_eq!(cover.get(0).unwrap().input(1), CubeValue::DontCare);
@@ -470,9 +471,9 @@ mod tests {
         let mut cover = Cover::new(2, 1);
         cover.add(Cube::from_str("1-", "1").unwrap()); // Covers 10 and 11
         cover.add(Cube::from_str("10", "1").unwrap()); // Redundant
-        
+
         cover.remove_redundant();
-        
+
         assert_eq!(cover.len(), 1);
     }
 
@@ -481,10 +482,10 @@ mod tests {
         let mut cover = Cover::new(2, 1);
         cover.add(Cube::from_str("1-", "1").unwrap());
         cover.add(Cube::from_str("01", "1").unwrap());
-        
+
         let cofactor = cover.cofactor(0, true);
         assert_eq!(cofactor.len(), 1); // Only "1-" contributes
-        
+
         let cofactor = cover.cofactor(0, false);
         assert_eq!(cofactor.len(), 1); // Only "01" contributes
     }

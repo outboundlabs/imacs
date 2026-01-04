@@ -20,9 +20,10 @@ use super::error::EspressoError;
 use std::io::{BufRead, BufReader, Read, Write};
 
 /// PLA file type specification
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PlaType {
     /// ON-set only (f)
+    #[default]
     F,
     /// OFF-set only (r)
     R,
@@ -36,12 +37,6 @@ pub enum PlaType {
     Dr,
     /// All three sets (fdr)
     Fdr,
-}
-
-impl Default for PlaType {
-    fn default() -> Self {
-        PlaType::F
-    }
 }
 
 /// Represents a parsed PLA file
@@ -97,22 +92,21 @@ impl Pla {
         let mut pla_type = PlaType::F;
         let mut cubes: Vec<(String, String)> = Vec::new();
         let mut comments: Vec<String> = Vec::new();
-        let mut line_num = 0;
 
-        for line_result in buf_reader.lines() {
+        for (line_num, line_result) in buf_reader.lines().enumerate() {
             let line = line_result?;
-            line_num += 1;
+            let line_num = line_num + 1; // 1-based line numbers
 
             let line = line.trim();
-            
+
             // Skip empty lines
             if line.is_empty() {
                 continue;
             }
 
             // Handle comments
-            if line.starts_with('#') {
-                comments.push(line[1..].trim().to_string());
+            if let Some(comment) = line.strip_prefix('#') {
+                comments.push(comment.trim().to_string());
                 continue;
             }
 
@@ -131,10 +125,11 @@ impl Pla {
                                 message: "Missing number of inputs".to_string(),
                             });
                         }
-                        num_inputs = Some(parts[1].parse().map_err(|_| EspressoError::InvalidPla {
-                            line: line_num,
-                            message: "Invalid number of inputs".to_string(),
-                        })?);
+                        num_inputs =
+                            Some(parts[1].parse().map_err(|_| EspressoError::InvalidPla {
+                                line: line_num,
+                                message: "Invalid number of inputs".to_string(),
+                            })?);
                     }
                     ".o" => {
                         if parts.len() < 2 {
@@ -143,10 +138,11 @@ impl Pla {
                                 message: "Missing number of outputs".to_string(),
                             });
                         }
-                        num_outputs = Some(parts[1].parse().map_err(|_| EspressoError::InvalidPla {
-                            line: line_num,
-                            message: "Invalid number of outputs".to_string(),
-                        })?);
+                        num_outputs =
+                            Some(parts[1].parse().map_err(|_| EspressoError::InvalidPla {
+                                line: line_num,
+                                message: "Invalid number of outputs".to_string(),
+                            })?);
                     }
                     ".p" => {
                         if parts.len() < 2 {
@@ -155,10 +151,11 @@ impl Pla {
                                 message: "Missing number of products".to_string(),
                             });
                         }
-                        num_products = Some(parts[1].parse().map_err(|_| EspressoError::InvalidPla {
-                            line: line_num,
-                            message: "Invalid number of products".to_string(),
-                        })?);
+                        num_products =
+                            Some(parts[1].parse().map_err(|_| EspressoError::InvalidPla {
+                                line: line_num,
+                                message: "Invalid number of products".to_string(),
+                            })?);
                     }
                     ".ilb" => {
                         input_labels = parts[1..].iter().map(|s| s.to_string()).collect();
@@ -213,11 +210,12 @@ impl Pla {
         }
 
         // Determine dimensions
-        let ni = num_inputs.unwrap_or_else(|| {
-            cubes.first().map(|(i, _)| i.len()).unwrap_or(0)
-        });
+        let ni = num_inputs.unwrap_or_else(|| cubes.first().map(|(i, _)| i.len()).unwrap_or(0));
         let no = num_outputs.unwrap_or_else(|| {
-            cubes.first().map(|(_, o)| if o.is_empty() { 1 } else { o.len() }).unwrap_or(1)
+            cubes
+                .first()
+                .map(|(_, o)| if o.is_empty() { 1 } else { o.len() })
+                .unwrap_or(1)
         });
 
         // Set default labels if not provided
@@ -291,7 +289,7 @@ impl Pla {
     pub fn write<W: Write>(&self, mut writer: W) -> Result<(), EspressoError> {
         writeln!(writer, ".i {}", self.num_inputs)?;
         writeln!(writer, ".o {}", self.num_outputs)?;
-        
+
         if !self.input_labels.iter().all(|l| l.starts_with('x')) {
             write!(writer, ".ilb")?;
             for label in &self.input_labels {
@@ -299,7 +297,7 @@ impl Pla {
             }
             writeln!(writer)?;
         }
-        
+
         if !self.output_labels.iter().all(|l| l.starts_with('y')) {
             write!(writer, ".ob")?;
             for label in &self.output_labels {
@@ -318,8 +316,8 @@ impl Pla {
         Ok(())
     }
 
-    /// Convert to string
-    pub fn to_string(&self) -> String {
+    /// Convert to PLA format string
+    pub fn format_pla(&self) -> String {
         let mut buf = Vec::new();
         self.write(&mut buf).unwrap();
         String::from_utf8(buf).unwrap()
@@ -364,7 +362,7 @@ impl Pla {
 
 impl std::fmt::Display for Pla {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", self.format_pla())
     }
 }
 

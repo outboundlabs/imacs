@@ -164,7 +164,7 @@ impl<'a> TsOrchRenderer<'a> {
                 }
             }
             ChainStep::Emit(emit) => {
-                let data = ts_expr(&emit.data);
+                let _data = ts_expr(&emit.data);
                 quote! {
                     // Emit event: $(&emit.event)
                     // emitter.emit($(quoted(&emit.event)), $data)

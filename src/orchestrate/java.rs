@@ -163,7 +163,7 @@ impl<'a> JavaOrchRenderer<'a> {
                 }
             }
             ChainStep::Emit(emit) => {
-                let data = java_expr(&emit.data);
+                let _data = java_expr(&emit.data);
                 quote! {
                     // Emit event: $(&emit.event)
                     // emitter.emit($(quoted(&emit.event)), $data);
@@ -201,7 +201,7 @@ impl<'a> JavaOrchRenderer<'a> {
         }
     }
 
-    fn render_parallel(&self, par: &ParallelStep, orch_name: &str) -> java::Tokens {
+    fn render_parallel(&self, par: &ParallelStep, _orch_name: &str) -> java::Tokens {
         quote! {
             // Parallel: $(&par.id)
             CompletableFuture.allOf(

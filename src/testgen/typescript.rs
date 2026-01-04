@@ -24,7 +24,10 @@ impl<'a> TsTestGen<'a> {
         out.push_str("// DO NOT EDIT — regenerate from spec\n\n");
 
         out.push_str("import { describe, it, expect } from 'vitest';\n");
-        out.push_str(&format!("import {{ {} }} from './{}';\n\n", func_name, spec.id));
+        out.push_str(&format!(
+            "import {{ {} }} from './{}';\n\n",
+            func_name, spec.id
+        ));
 
         out.push_str(&format!("describe('{}', () => {{\n", func_name));
 
@@ -36,9 +39,14 @@ impl<'a> TsTestGen<'a> {
 
             out.push_str(&format!(
                 "    it('{}: {} → {}', () => {{\n",
-                rule.id, rule.as_cel().unwrap_or_default(), rule.then
+                rule.id,
+                rule.as_cel().unwrap_or_default(),
+                rule.then
             ));
-            out.push_str(&format!("      expect({}({})).toBe({});\n", func_name, inputs, expected));
+            out.push_str(&format!(
+                "      expect({}({})).toBe({});\n",
+                func_name, inputs, expected
+            ));
             out.push_str("    });\n\n");
         }
         out.push_str("  });\n\n");
@@ -50,12 +58,18 @@ impl<'a> TsTestGen<'a> {
 
             for (inputs, rule_id, expected) in generate_combinations(spec) {
                 let input_obj = self.format_input_object(spec, &inputs);
-                out.push_str(&format!("      {{ input: {}, expected: {}, rule: '{}' }},\n", input_obj, expected, rule_id));
+                out.push_str(&format!(
+                    "      {{ input: {}, expected: {}, rule: '{}' }},\n",
+                    input_obj, expected, rule_id
+                ));
             }
 
             out.push_str("    ];\n\n");
             out.push_str("    it.each(cases)('$rule', ({ input, expected }) => {\n");
-            out.push_str(&format!("      expect({}(input)).toBe(expected);\n", func_name));
+            out.push_str(&format!(
+                "      expect({}(input)).toBe(expected);\n",
+                func_name
+            ));
             out.push_str("    });\n");
             out.push_str("  });\n");
         }
@@ -65,18 +79,27 @@ impl<'a> TsTestGen<'a> {
     }
 
     fn generate_input_object(&self, spec: &Spec, rule: &Rule) -> String {
-        let fields: Vec<String> = spec.inputs.iter().map(|input| {
-            let value = rule.conditions.as_ref()
-                .and_then(|c| c.iter().find(|cond| cond.var == input.name))
-                .map(|c| self.ts_condition_value(&c.value))
-                .unwrap_or_else(|| self.default_value(&input.typ));
-            format!("{}: {}", to_camel_case(&input.name), value)
-        }).collect();
+        let fields: Vec<String> = spec
+            .inputs
+            .iter()
+            .map(|input| {
+                let value = rule
+                    .conditions
+                    .as_ref()
+                    .and_then(|c| c.iter().find(|cond| cond.var == input.name))
+                    .map(|c| self.ts_condition_value(&c.value))
+                    .unwrap_or_else(|| self.default_value(&input.typ));
+                format!("{}: {}", to_camel_case(&input.name), value)
+            })
+            .collect();
         format!("{{ {} }}", fields.join(", "))
     }
 
     fn format_input_object(&self, spec: &Spec, values: &[String]) -> String {
-        let fields: Vec<String> = spec.inputs.iter().zip(values.iter())
+        let fields: Vec<String> = spec
+            .inputs
+            .iter()
+            .zip(values.iter())
             .map(|(input, value)| format!("{}: {}", to_camel_case(&input.name), value))
             .collect();
         format!("{{ {} }}", fields.join(", "))

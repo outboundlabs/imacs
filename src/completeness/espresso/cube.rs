@@ -114,9 +114,13 @@ impl Cube {
     }
 
     /// Parse from a single line (space-separated input and output)
-    pub fn parse_line(line: &str, num_inputs: usize, num_outputs: usize) -> Result<Self, EspressoError> {
+    pub fn parse_line(
+        line: &str,
+        num_inputs: usize,
+        num_outputs: usize,
+    ) -> Result<Self, EspressoError> {
         let parts: Vec<&str> = line.split_whitespace().collect();
-        
+
         if parts.is_empty() {
             return Err(EspressoError::InvalidCube("Empty line".to_string()));
         }
@@ -225,7 +229,11 @@ impl Cube {
     /// Count the total cost (literals * active outputs)
     pub fn cost(&self) -> usize {
         let literals = self.literal_count();
-        let active_outputs = self.outputs.iter().filter(|v| **v == CubeValue::One).count();
+        let active_outputs = self
+            .outputs
+            .iter()
+            .filter(|v| **v == CubeValue::One)
+            .count();
         if active_outputs == 0 {
             0
         } else {
@@ -245,7 +253,7 @@ impl Cube {
 
     /// Check if this cube has any active output
     pub fn has_active_output(&self) -> bool {
-        self.outputs.iter().any(|v| *v == CubeValue::One)
+        self.outputs.contains(&CubeValue::One)
     }
 
     /// Check if two cubes can be merged (differ in exactly one variable)
@@ -274,7 +282,7 @@ impl Cube {
     }
 
     /// Merge two cubes that differ in exactly one variable
-    pub fn merge(&self, other: &Cube, diff_pos: usize) -> Cube {
+    pub fn merge(&self, _other: &Cube, diff_pos: usize) -> Cube {
         let mut result = self.clone();
         result.inputs[diff_pos] = CubeValue::DontCare;
         result
@@ -401,7 +409,7 @@ impl Cube {
     /// Complement the cube (De Morgan's law)
     pub fn complement(&self) -> Vec<Cube> {
         let mut result = Vec::new();
-        
+
         for i in 0..self.inputs.len() {
             if self.inputs[i].is_literal() {
                 let mut new_cube = Cube::new(self.inputs.len(), self.outputs.len());
@@ -410,11 +418,11 @@ impl Cube {
                 result.push(new_cube);
             }
         }
-        
+
         if result.is_empty() {
             // Empty cube - no complement
         }
-        
+
         result
     }
 }
@@ -445,10 +453,10 @@ mod tests {
     fn test_cube_merge() {
         let c1 = Cube::from_str("10", "1").unwrap();
         let c2 = Cube::from_str("11", "1").unwrap();
-        
+
         let diff = c1.can_merge(&c2);
         assert_eq!(diff, Some(1));
-        
+
         let merged = c1.merge(&c2, 1);
         assert_eq!(merged.input(0), CubeValue::One);
         assert_eq!(merged.input(1), CubeValue::DontCare);
@@ -459,7 +467,7 @@ mod tests {
         let c1 = Cube::from_str("1-", "1").unwrap(); // Covers 10 and 11
         let c2 = Cube::from_str("10", "1").unwrap();
         let c3 = Cube::from_str("01", "1").unwrap();
-        
+
         assert!(c1.contains(&c2));
         assert!(!c1.contains(&c3));
     }
@@ -468,7 +476,7 @@ mod tests {
     fn test_cube_intersection() {
         let c1 = Cube::from_str("1-", "1").unwrap();
         let c2 = Cube::from_str("-0", "1").unwrap();
-        
+
         let inter = c1.intersect(&c2).unwrap();
         assert_eq!(inter.input(0), CubeValue::One);
         assert_eq!(inter.input(1), CubeValue::Zero);
@@ -478,7 +486,7 @@ mod tests {
     fn test_disjoint_cubes() {
         let c1 = Cube::from_str("10", "1").unwrap();
         let c2 = Cube::from_str("01", "1").unwrap();
-        
+
         assert!(c1.intersect(&c2).is_none());
     }
 
@@ -486,7 +494,7 @@ mod tests {
     fn test_literal_count() {
         let c1 = Cube::from_str("10-1", "1").unwrap();
         assert_eq!(c1.literal_count(), 3);
-        
+
         let c2 = Cube::from_str("----", "1").unwrap();
         assert_eq!(c2.literal_count(), 0);
     }

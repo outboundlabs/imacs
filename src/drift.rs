@@ -427,10 +427,11 @@ impl DriftDetector {
                 }
             }
 
-            AstNode::Block { result, .. } => {
-                if let Some(inner) = result {
-                    self.extract_rules_recursive(inner, params, current, rules);
-                }
+            AstNode::Block {
+                result: Some(inner),
+                ..
+            } => {
+                self.extract_rules_recursive(inner, params, current, rules);
             }
 
             _ => {}

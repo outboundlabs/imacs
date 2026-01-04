@@ -33,27 +33,62 @@ impl<'a> CSharpTestGen<'a> {
 
             out.push_str("    [Fact]\n");
             out.push_str(&format!("    public void {}()\n    {{\n", test_name));
-            out.push_str(&format!("        // {}: {} → {}\n", rule.id, rule.as_cel().unwrap_or_default(), rule.then));
-            out.push_str(&format!("        Assert.Equal({}, {}.Evaluate({}));\n", expected, class_name, inputs));
+            out.push_str(&format!(
+                "        // {}: {} → {}\n",
+                rule.id,
+                rule.as_cel().unwrap_or_default(),
+                rule.then
+            ));
+            out.push_str(&format!(
+                "        Assert.Equal({}, {}.Evaluate({}));\n",
+                expected, class_name, inputs
+            ));
             out.push_str("    }\n\n");
         }
 
         if self.config.exhaustive && can_enumerate(spec) {
             out.push_str("    // Exhaustive tests\n    [Theory]\n");
             for (inputs, rule_id, expected) in generate_combinations(spec) {
-                let input_vals = inputs.iter().map(|i| self.to_csharp_value(i)).collect::<Vec<_>>().join(", ");
-                out.push_str(&format!("    [InlineData({}, {})] // {}\n", input_vals, expected, rule_id));
+                let input_vals = inputs
+                    .iter()
+                    .map(|i| self.to_csharp_value(i))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                out.push_str(&format!(
+                    "    [InlineData({}, {})] // {}\n",
+                    input_vals, expected, rule_id
+                ));
             }
 
-            let params = spec.inputs.iter()
+            let params = spec
+                .inputs
+                .iter()
                 .map(|i| format!("{} {}", self.csharp_type(&i.typ), to_camel_case(&i.name)))
-                .collect::<Vec<_>>().join(", ");
-            let expected_type = spec.outputs.first().map(|o| self.csharp_type(&o.typ)).unwrap_or_else(|| "object".into());
+                .collect::<Vec<_>>()
+                .join(", ");
+            let expected_type = spec
+                .outputs
+                .first()
+                .map(|o| self.csharp_type(&o.typ))
+                .unwrap_or_else(|| "object".into());
 
-            out.push_str(&format!("    public void TestExhaustive({}, {} expected)\n    {{\n", params, expected_type));
-            out.push_str(&format!("        var input = new {}Input {{ {} }};\n", class_name,
-                spec.inputs.iter().map(|i| format!("{} = {}", to_pascal_case(&i.name), to_camel_case(&i.name))).collect::<Vec<_>>().join(", ")));
-            out.push_str(&format!("        Assert.Equal(expected, {}.Evaluate(input));\n    }}\n", class_name));
+            out.push_str(&format!(
+                "    public void TestExhaustive({}, {} expected)\n    {{\n",
+                params, expected_type
+            ));
+            out.push_str(&format!(
+                "        var input = new {}Input {{ {} }};\n",
+                class_name,
+                spec.inputs
+                    .iter()
+                    .map(|i| format!("{} = {}", to_pascal_case(&i.name), to_camel_case(&i.name)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            out.push_str(&format!(
+                "        Assert.Equal(expected, {}.Evaluate(input));\n    }}\n",
+                class_name
+            ));
         }
 
         out.push_str("}\n");
@@ -61,14 +96,24 @@ impl<'a> CSharpTestGen<'a> {
     }
 
     fn generate_input_object(&self, spec: &Spec, rule: &Rule) -> String {
-        let fields: Vec<String> = spec.inputs.iter().map(|input| {
-            let value = rule.conditions.as_ref()
-                .and_then(|c| c.iter().find(|cond| cond.var == input.name))
-                .map(|c| self.csharp_condition_value(&c.value))
-                .unwrap_or_else(|| self.default_value(&input.typ));
-            format!("{} = {}", to_pascal_case(&input.name), value)
-        }).collect();
-        format!("new {}Input {{ {} }}", to_pascal_case(&spec.id), fields.join(", "))
+        let fields: Vec<String> = spec
+            .inputs
+            .iter()
+            .map(|input| {
+                let value = rule
+                    .conditions
+                    .as_ref()
+                    .and_then(|c| c.iter().find(|cond| cond.var == input.name))
+                    .map(|c| self.csharp_condition_value(&c.value))
+                    .unwrap_or_else(|| self.default_value(&input.typ));
+                format!("{} = {}", to_pascal_case(&input.name), value)
+            })
+            .collect();
+        format!(
+            "new {}Input {{ {} }}",
+            to_pascal_case(&spec.id),
+            fields.join(", ")
+        )
     }
 
     fn to_csharp_value(&self, v: &str) -> String {

@@ -14,11 +14,62 @@ Spec-driven code verification, generation, and testing.
 IMACS treats **specifications** as the source of truth for decision logic. From a single YAML spec, you can:
 
 - ✅ **Verify** that code correctly implements all rules
-- 🔄 **Generate** code in multiple languages (Rust, TypeScript, Python)
+- 🔄 **Generate** code in 6 languages (Rust, TypeScript, Python, Go, Java, C#)
 - 🧪 **Generate tests** that cover every rule and edge case
 - 🔍 **Detect drift** between frontend and backend implementations
 - 📊 **Analyze** existing code for complexity
 - 📝 **Extract** specs from legacy code
+- 🧮 **Analyze completeness** to find missing cases and overlapping rules
+- ⚡ **Minimize rules** using Espresso Boolean optimization
+
+## Two Spec Types
+
+IMACS supports two types of specifications:
+
+| Type | Purpose | Complexity | Verification |
+|------|---------|------------|--------------|
+| **Decision Table** | Pure decision logic (if/else/match) | O(n) rules | Full |
+| **Orchestrator** | Workflow composition (sequence, branch, loop) | Turing-complete | Partial |
+
+### Decision Tables (Specs)
+
+For pure decision logic — no side effects, no I/O:
+
+```yaml
+id: login_attempt
+rules:
+  - when: "rate_exceeded"
+    then: 429
+  - when: "!rate_exceeded && locked"
+    then: 423
+  - when: "!rate_exceeded && !locked && valid_creds"
+    then: 200
+```
+
+### Orchestrators
+
+For composing multiple specs into workflows:
+
+```yaml
+id: order_flow
+uses: [access_level, shipping_rate]
+
+chain:
+  - step: call
+    id: check_access
+    spec: access_level
+    inputs: { role: "role", verified: "verified" }
+
+  - step: gate
+    condition: "check_access.level >= 50"
+
+  - step: call
+    id: calc_shipping
+    spec: shipping_rate
+    inputs: { weight_kg: "weight_kg", zone: "zone" }
+```
+
+Orchestrator step types: `call`, `gate`, `branch`, `parallel`, `loop`, `compute`, `try`
 
 ## Quick Start
 
@@ -229,26 +280,70 @@ imacs test payment.yaml --lang python > test_payment.py
 # Creates: rule tests, exhaustive tests, boundary tests, property tests
 ```
 
+## Completeness Analysis
+
+IMACS uses the **Espresso algorithm** (same as used in hardware logic optimization) to analyze decision tables:
+
+```rust
+use imacs::{analyze_completeness, extract_predicates, minimize_rules};
+
+let spec = Spec::from_yaml(yaml)?;
+let report = analyze_completeness(&spec);
+
+if !report.is_complete {
+    for case in &report.missing_cases {
+        // LLM tool uses these to ask clarifying questions
+        println!("Missing case: {:?}", case.cel_conditions);
+    }
+}
+
+for overlap in &report.overlaps {
+    println!("Rules {} and {} overlap", overlap.rule_a, overlap.rule_b);
+}
+```
+
+### What It Detects
+
+| Analysis | Description |
+|----------|-------------|
+| **Missing cases** | Input combinations with no matching rule |
+| **Overlapping rules** | Multiple rules match the same input |
+| **Minimization opportunities** | Redundant rules that can be simplified |
+
+### How It Works
+
+1. **Predicate extraction**: Parse CEL expressions into atomic boolean predicates
+2. **Truth table analysis**: Enumerate all 2^n combinations
+3. **Gap detection**: Find uncovered input patterns
+4. **Espresso minimization**: EXPAND → REDUCE → IRREDUNDANT phases
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                                                             │
-│  SPEC (YAML + CEL)                                          │
-│       │                                                     │
-│       ├──► verify(spec, code) ──► VerificationResult        │
+│  DECISION TABLE (YAML + CEL)                                │
 │       │                                                     │
 │       ├──► render(spec, target) ──► Code String             │
+│       ├──► generate_tests(spec) ──► Test String             │
+│       ├──► verify(spec, code) ──► VerificationResult        │
+│       └──► analyze_completeness(spec) ──► IncompletenessReport│
+│                                                             │
+│  ORCHESTRATOR (YAML)                                        │
 │       │                                                     │
-│       └──► generate_tests(spec, target) ──► Test String     │
+│       └──► render_orchestrator(orch, specs) ──► Code String │
 │                                                             │
 │  CODE                                                       │
 │       │                                                     │
 │       ├──► analyze(code) ──► AnalysisReport                 │
-│       │                                                     │
 │       ├──► extract(code) ──► ExtractedSpec                  │
-│       │                                                     │
 │       └──► compare(code_a, code_b) ──► DriftReport          │
+│                                                             │
+│  COMPLETENESS (Espresso)                                    │
+│       │                                                     │
+│       ├──► extract_predicates(spec) ──► PredicateSet        │
+│       ├──► rules_to_cover(rules) ──► Espresso Cover         │
+│       └──► minimize_rules(rules) ──► Simplified CEL         │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```

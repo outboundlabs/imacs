@@ -156,7 +156,7 @@ impl<'a> CSharpOrchRenderer<'a> {
                 }
             }
             ChainStep::Emit(emit) => {
-                let data = csharp_expr(&emit.data);
+                let _data = csharp_expr(&emit.data);
                 quote! {
                     // Emit event: $(&emit.event)
                     // await emitter.EmitAsync($(quoted(&emit.event)), $data);
@@ -197,7 +197,7 @@ impl<'a> CSharpOrchRenderer<'a> {
         }
     }
 
-    fn render_parallel(&self, par: &ParallelStep, orch_name: &str) -> csharp::Tokens {
+    fn render_parallel(&self, par: &ParallelStep, _orch_name: &str) -> csharp::Tokens {
         quote! {
             // Parallel: $(&par.id)
             await Task.WhenAll(

@@ -15,7 +15,7 @@ pub use crate::ast::Language;
 pub fn parse_rust(source: &str) -> Result<CodeAst> {
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_rust::language())
+        .set_language(&tree_sitter_rust::LANGUAGE.into())
         .map_err(|e| Error::CodeParse(format!("Failed to set language: {}", e)))?;
 
     let tree = parser
@@ -149,7 +149,9 @@ fn parse_rust_block(node: Node, source: &str) -> AstNode {
     let children: Vec<_> = node.children(&mut cursor).collect();
 
     // Find the index of the last non-brace child
-    let last_expr_idx = children.iter().rposition(|c| c.kind() != "{" && c.kind() != "}");
+    let last_expr_idx = children
+        .iter()
+        .rposition(|c| c.kind() != "{" && c.kind() != "}");
 
     for (i, child) in children.iter().enumerate() {
         let is_last = Some(i) == last_expr_idx;
@@ -623,7 +625,7 @@ fn parse_rust_match(node: Node, source: &str) -> AstNode {
 
 fn parse_rust_match_arm(node: Node, source: &str) -> Option<MatchArm> {
     let mut pattern = None;
-    let mut guard = None;
+    let guard = None;
     let mut body = None;
 
     let mut cursor = node.walk();
@@ -826,7 +828,10 @@ fn parse_rust_for(node: Node, source: &str) -> AstNode {
                 let range_children: Vec<_> = child.children(&mut range_cursor).collect();
                 if range_children.len() >= 2 {
                     let start = Box::new(parse_rust_expr(range_children[0], source));
-                    let end = Box::new(parse_rust_expr(range_children[range_children.len() - 1], source));
+                    let end = Box::new(parse_rust_expr(
+                        range_children[range_children.len() - 1],
+                        source,
+                    ));
                     return AstNode::For {
                         counter,
                         start,
@@ -989,7 +994,7 @@ fn node_span(node: Node) -> Span {
 pub fn parse_typescript(source: &str) -> Result<CodeAst> {
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_typescript::language_typescript())
+        .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
         .map_err(|e| Error::CodeParse(format!("Failed to set language: {}", e)))?;
 
     let tree = parser
@@ -1050,7 +1055,13 @@ fn parse_ts_function(node: Node, source: &str) -> Option<Function> {
                 params = parse_ts_parameters(child, source);
             }
             "type_annotation" => {
-                return_type = Some(child.utf8_text(source.as_bytes()).unwrap_or("").trim_start_matches(": ").to_string());
+                return_type = Some(
+                    child
+                        .utf8_text(source.as_bytes())
+                        .unwrap_or("")
+                        .trim_start_matches(": ")
+                        .to_string(),
+                );
             }
             "statement_block" => {
                 body = Some(parse_ts_block(child, source));
@@ -1089,10 +1100,17 @@ fn parse_ts_parameters(node: Node, source: &str) -> Vec<Parameter> {
             for param_child in child.children(&mut param_cursor) {
                 match param_child.kind() {
                     "identifier" => {
-                        name = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                        name = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
                     "type_annotation" => {
-                        typ = param_child.utf8_text(source.as_bytes()).unwrap_or("").trim_start_matches(": ").to_string();
+                        typ = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .trim_start_matches(": ")
+                            .to_string();
                     }
                     _ => {}
                 }
@@ -1113,7 +1131,9 @@ fn parse_ts_block(node: Node, source: &str) -> AstNode {
     let mut cursor = node.walk();
 
     let children: Vec<_> = node.children(&mut cursor).collect();
-    let last_expr_idx = children.iter().rposition(|c| c.kind() != "{" && c.kind() != "}");
+    let last_expr_idx = children
+        .iter()
+        .rposition(|c| c.kind() != "{" && c.kind() != "}");
 
     for (i, child) in children.iter().enumerate() {
         let is_last = Some(i) == last_expr_idx;
@@ -1187,9 +1207,15 @@ fn parse_ts_let(node: Node, source: &str) -> AstNode {
             for decl_child in child.children(&mut decl_cursor) {
                 match decl_child.kind() {
                     "identifier" => {
-                        name = decl_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                        name = decl_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
-                    _ if value.is_none() && decl_child.kind() != "=" && decl_child.kind() != "type_annotation" => {
+                    _ if value.is_none()
+                        && decl_child.kind() != "="
+                        && decl_child.kind() != "type_annotation" =>
+                    {
                         value = Some(Box::new(parse_ts_expr(decl_child, source)));
                     }
                     _ => {}
@@ -1275,7 +1301,9 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
         }
         "string" | "template_string" => {
             let text = node.utf8_text(source.as_bytes()).unwrap_or("\"\"");
-            let value = text.trim_matches(|c| c == '"' || c == '\'' || c == '`').to_string();
+            let value = text
+                .trim_matches(|c| c == '"' || c == '\'' || c == '`')
+                .to_string();
             AstNode::Literal {
                 value: LiteralValue::String(value),
                 span: node_span(node),
@@ -1302,7 +1330,10 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                     return parse_ts_expr(child, source);
                 }
             }
-            AstNode::Unknown { kind: "empty_parens".into(), span: node_span(node) }
+            AstNode::Unknown {
+                kind: "empty_parens".into(),
+                span: node_span(node),
+            }
         }
         "call_expression" => {
             let mut function = String::new();
@@ -1316,7 +1347,10 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                     "arguments" => {
                         let mut arg_cursor = child.walk();
                         for arg_child in child.children(&mut arg_cursor) {
-                            if arg_child.kind() != "(" && arg_child.kind() != ")" && arg_child.kind() != "," {
+                            if arg_child.kind() != "("
+                                && arg_child.kind() != ")"
+                                && arg_child.kind() != ","
+                            {
                                 args.push(parse_ts_expr(arg_child, source));
                             }
                         }
@@ -1324,17 +1358,32 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                     _ => {}
                 }
             }
-            AstNode::Call { function, args, span: node_span(node) }
+            AstNode::Call {
+                function,
+                args,
+                span: node_span(node),
+            }
         }
         "member_expression" => {
             let mut cursor = node.walk();
             let children: Vec<_> = node.children(&mut cursor).collect();
             if children.len() >= 3 {
                 let object = Box::new(parse_ts_expr(children[0], source));
-                let field = children.last().and_then(|n| n.utf8_text(source.as_bytes()).ok()).unwrap_or("").to_string();
-                AstNode::Field { object, field, span: node_span(node) }
+                let field = children
+                    .last()
+                    .and_then(|n| n.utf8_text(source.as_bytes()).ok())
+                    .unwrap_or("")
+                    .to_string();
+                AstNode::Field {
+                    object,
+                    field,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "member_expression".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "member_expression".into(),
+                    span: node_span(node),
+                }
             }
         }
         "for_statement" | "for_in_statement" => {
@@ -1353,7 +1402,8 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                         for decl_child in child.children(&mut decl_cursor) {
                             if decl_child.kind() == "variable_declarator" {
                                 if let Some(id) = decl_child.child_by_field_name("name") {
-                                    counter = id.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                                    counter =
+                                        id.utf8_text(source.as_bytes()).unwrap_or("").to_string();
                                 }
                             }
                         }
@@ -1361,7 +1411,14 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                     "statement_block" => {
                         body = Some(Box::new(parse_ts_block(child, source)));
                     }
-                    _ if collection.is_none() && !counter.is_empty() && child.kind() != "for" && child.kind() != "(" && child.kind() != ")" && child.kind() != "of" && child.kind() != "in" => {
+                    _ if collection.is_none()
+                        && !counter.is_empty()
+                        && child.kind() != "for"
+                        && child.kind() != "("
+                        && child.kind() != ")"
+                        && child.kind() != "of"
+                        && child.kind() != "in" =>
+                    {
                         collection = Some(Box::new(parse_ts_expr(child, source)));
                     }
                     _ => {}
@@ -1372,11 +1429,18 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                     item: counter,
                     index: None,
                     collection: coll,
-                    body: body.unwrap_or(Box::new(AstNode::Block { statements: vec![], result: None, span: node_span(node) })),
+                    body: body.unwrap_or(Box::new(AstNode::Block {
+                        statements: vec![],
+                        result: None,
+                        span: node_span(node),
+                    })),
                     span: node_span(node),
                 }
             } else {
-                AstNode::Unknown { kind: "for_statement".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "for_statement".into(),
+                    span: node_span(node),
+                }
             }
         }
         "while_statement" => {
@@ -1395,8 +1459,15 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                 }
             }
             AstNode::While {
-                condition: condition.unwrap_or(Box::new(AstNode::Literal { value: LiteralValue::Bool(true), span: node_span(node) })),
-                body: body.unwrap_or(Box::new(AstNode::Block { statements: vec![], result: None, span: node_span(node) })),
+                condition: condition.unwrap_or(Box::new(AstNode::Literal {
+                    value: LiteralValue::Bool(true),
+                    span: node_span(node),
+                })),
+                body: body.unwrap_or(Box::new(AstNode::Block {
+                    statements: vec![],
+                    result: None,
+                    span: node_span(node),
+                })),
                 span: node_span(node),
             }
         }
@@ -1416,10 +1487,16 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                         for catch_child in child.children(&mut catch_cursor) {
                             match catch_child.kind() {
                                 "identifier" => {
-                                    catch_var = Some(catch_child.utf8_text(source.as_bytes()).unwrap_or("").to_string());
+                                    catch_var = Some(
+                                        catch_child
+                                            .utf8_text(source.as_bytes())
+                                            .unwrap_or("")
+                                            .to_string(),
+                                    );
                                 }
                                 "statement_block" => {
-                                    catch_block = Some(Box::new(parse_ts_block(catch_child, source)));
+                                    catch_block =
+                                        Some(Box::new(parse_ts_block(catch_child, source)));
                                 }
                                 _ => {}
                             }
@@ -1437,7 +1514,11 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                 }
             }
             AstNode::Try {
-                try_block: try_block.unwrap_or(Box::new(AstNode::Block { statements: vec![], result: None, span: node_span(node) })),
+                try_block: try_block.unwrap_or(Box::new(AstNode::Block {
+                    statements: vec![],
+                    result: None,
+                    span: node_span(node),
+                })),
                 catch_var,
                 catch_block,
                 finally_block,
@@ -1450,19 +1531,32 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
             if children.len() >= 3 {
                 let target = Box::new(parse_ts_expr(children[0], source));
                 let value = Box::new(parse_ts_expr(children[2], source));
-                AstNode::Assign { target, value, span: node_span(node) }
+                AstNode::Assign {
+                    target,
+                    value,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "assignment_incomplete".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "assignment_incomplete".into(),
+                    span: node_span(node),
+                }
             }
         }
         "await_expression" => {
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() != "await" {
-                    return AstNode::Await { expr: Box::new(parse_ts_expr(child, source)), span: node_span(node) };
+                    return AstNode::Await {
+                        expr: Box::new(parse_ts_expr(child, source)),
+                        span: node_span(node),
+                    };
                 }
             }
-            AstNode::Unknown { kind: "await_empty".into(), span: node_span(node) }
+            AstNode::Unknown {
+                kind: "await_empty".into(),
+                span: node_span(node),
+            }
         }
         "arrow_function" | "function_expression" => {
             let mut params = Vec::new();
@@ -1474,7 +1568,12 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
                         let mut param_cursor = child.walk();
                         for param_child in child.children(&mut param_cursor) {
                             if param_child.kind() == "identifier" {
-                                params.push(param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string());
+                                params.push(
+                                    param_child
+                                        .utf8_text(source.as_bytes())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                );
                             }
                         }
                     }
@@ -1493,7 +1592,10 @@ fn parse_ts_expr(node: Node, source: &str) -> AstNode {
             }
             AstNode::Closure {
                 params,
-                body: body.unwrap_or(Box::new(AstNode::Literal { value: LiteralValue::Unit, span: node_span(node) })),
+                body: body.unwrap_or(Box::new(AstNode::Literal {
+                    value: LiteralValue::Unit,
+                    span: node_span(node),
+                })),
                 span: node_span(node),
             }
         }
@@ -1509,7 +1611,10 @@ fn parse_ts_binary(node: Node, source: &str) -> AstNode {
     let children: Vec<_> = node.children(&mut cursor).collect();
 
     if children.len() < 3 {
-        return AstNode::Unknown { kind: "binary_incomplete".into(), span: node_span(node) };
+        return AstNode::Unknown {
+            kind: "binary_incomplete".into(),
+            span: node_span(node),
+        };
     }
 
     let left = Box::new(parse_ts_expr(children[0], source));
@@ -1530,10 +1635,20 @@ fn parse_ts_binary(node: Node, source: &str) -> AstNode {
         ">=" => BinaryOp::Ge,
         "&&" => BinaryOp::And,
         "||" => BinaryOp::Or,
-        _ => return AstNode::Unknown { kind: format!("unknown_op:{}", op_text), span: node_span(node) },
+        _ => {
+            return AstNode::Unknown {
+                kind: format!("unknown_op:{}", op_text),
+                span: node_span(node),
+            }
+        }
     };
 
-    AstNode::Binary { op, left, right, span: node_span(node) }
+    AstNode::Binary {
+        op,
+        left,
+        right,
+        span: node_span(node),
+    }
 }
 
 fn parse_ts_unary(node: Node, source: &str) -> AstNode {
@@ -1541,7 +1656,10 @@ fn parse_ts_unary(node: Node, source: &str) -> AstNode {
     let children: Vec<_> = node.children(&mut cursor).collect();
 
     if children.len() < 2 {
-        return AstNode::Unknown { kind: "unary_incomplete".into(), span: node_span(node) };
+        return AstNode::Unknown {
+            kind: "unary_incomplete".into(),
+            span: node_span(node),
+        };
     }
 
     let op_text = children[0].utf8_text(source.as_bytes()).unwrap_or("");
@@ -1550,10 +1668,19 @@ fn parse_ts_unary(node: Node, source: &str) -> AstNode {
     let op = match op_text {
         "-" => UnaryOp::Neg,
         "!" => UnaryOp::Not,
-        _ => return AstNode::Unknown { kind: format!("unknown_unary:{}", op_text), span: node_span(node) },
+        _ => {
+            return AstNode::Unknown {
+                kind: format!("unknown_unary:{}", op_text),
+                span: node_span(node),
+            }
+        }
     };
 
-    AstNode::Unary { op, operand, span: node_span(node) }
+    AstNode::Unary {
+        op,
+        operand,
+        span: node_span(node),
+    }
 }
 
 // ============================================================================
@@ -1564,7 +1691,7 @@ fn parse_ts_unary(node: Node, source: &str) -> AstNode {
 pub fn parse_python(source: &str) -> Result<CodeAst> {
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_python::language())
+        .set_language(&tree_sitter_python::LANGUAGE.into())
         .map_err(|e| Error::CodeParse(format!("Failed to set language: {}", e)))?;
 
     let tree = parser
@@ -1652,10 +1779,16 @@ fn parse_py_parameters(node: Node, source: &str) -> Vec<Parameter> {
                 for param_child in child.children(&mut param_cursor) {
                     match param_child.kind() {
                         "identifier" => {
-                            name = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                            name = param_child
+                                .utf8_text(source.as_bytes())
+                                .unwrap_or("")
+                                .to_string();
                         }
                         "type" => {
-                            typ = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                            typ = param_child
+                                .utf8_text(source.as_bytes())
+                                .unwrap_or("")
+                                .to_string();
                         }
                         _ => {}
                     }
@@ -1677,7 +1810,9 @@ fn parse_py_block(node: Node, source: &str) -> AstNode {
     let mut cursor = node.walk();
 
     let children: Vec<_> = node.children(&mut cursor).collect();
-    let last_stmt_idx = children.iter().rposition(|c| c.kind() != ":" && !c.kind().is_empty());
+    let last_stmt_idx = children
+        .iter()
+        .rposition(|c| c.kind() != ":" && !c.kind().is_empty());
 
     for (i, child) in children.iter().enumerate() {
         let is_last = Some(i) == last_stmt_idx;
@@ -1830,11 +1965,24 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                     ">=" => BinaryOp::Ge,
                     "and" => BinaryOp::And,
                     "or" => BinaryOp::Or,
-                    _ => return AstNode::Unknown { kind: format!("unknown_op:{}", op_text), span: node_span(node) },
+                    _ => {
+                        return AstNode::Unknown {
+                            kind: format!("unknown_op:{}", op_text),
+                            span: node_span(node),
+                        }
+                    }
                 };
-                AstNode::Binary { op, left, right, span: node_span(node) }
+                AstNode::Binary {
+                    op,
+                    left,
+                    right,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "binary_incomplete".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "binary_incomplete".into(),
+                    span: node_span(node),
+                }
             }
         }
         "parenthesized_expression" => {
@@ -1844,7 +1992,10 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                     return parse_py_expr(child, source);
                 }
             }
-            AstNode::Unknown { kind: "empty_parens".into(), span: node_span(node) }
+            AstNode::Unknown {
+                kind: "empty_parens".into(),
+                span: node_span(node),
+            }
         }
         "call" => {
             let mut function = String::new();
@@ -1858,7 +2009,10 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                     "argument_list" => {
                         let mut arg_cursor = child.walk();
                         for arg_child in child.children(&mut arg_cursor) {
-                            if arg_child.kind() != "(" && arg_child.kind() != ")" && arg_child.kind() != "," {
+                            if arg_child.kind() != "("
+                                && arg_child.kind() != ")"
+                                && arg_child.kind() != ","
+                            {
                                 args.push(parse_py_expr(arg_child, source));
                             }
                         }
@@ -1866,7 +2020,11 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                     _ => {}
                 }
             }
-            AstNode::Call { function, args, span: node_span(node) }
+            AstNode::Call {
+                function,
+                args,
+                span: node_span(node),
+            }
         }
         "for_statement" => {
             // Python: for item in collection:
@@ -1882,7 +2040,12 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                     "block" => {
                         body = Some(Box::new(parse_py_block(child, source)));
                     }
-                    _ if collection.is_none() && !item.is_empty() && child.kind() != "for" && child.kind() != "in" && child.kind() != ":" => {
+                    _ if collection.is_none()
+                        && !item.is_empty()
+                        && child.kind() != "for"
+                        && child.kind() != "in"
+                        && child.kind() != ":" =>
+                    {
                         collection = Some(Box::new(parse_py_expr(child, source)));
                     }
                     _ => {}
@@ -1891,8 +2054,15 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
             AstNode::ForEach {
                 item,
                 index: None,
-                collection: collection.unwrap_or(Box::new(AstNode::Unknown { kind: "no_collection".into(), span: node_span(node) })),
-                body: body.unwrap_or(Box::new(AstNode::Block { statements: vec![], result: None, span: node_span(node) })),
+                collection: collection.unwrap_or(Box::new(AstNode::Unknown {
+                    kind: "no_collection".into(),
+                    span: node_span(node),
+                })),
+                body: body.unwrap_or(Box::new(AstNode::Block {
+                    statements: vec![],
+                    result: None,
+                    span: node_span(node),
+                })),
                 span: node_span(node),
             }
         }
@@ -1912,8 +2082,15 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                 }
             }
             AstNode::While {
-                condition: condition.unwrap_or(Box::new(AstNode::Literal { value: LiteralValue::Bool(true), span: node_span(node) })),
-                body: body.unwrap_or(Box::new(AstNode::Block { statements: vec![], result: None, span: node_span(node) })),
+                condition: condition.unwrap_or(Box::new(AstNode::Literal {
+                    value: LiteralValue::Bool(true),
+                    span: node_span(node),
+                })),
+                body: body.unwrap_or(Box::new(AstNode::Block {
+                    statements: vec![],
+                    result: None,
+                    span: node_span(node),
+                })),
                 span: node_span(node),
             }
         }
@@ -1933,10 +2110,16 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                         for except_child in child.children(&mut except_cursor) {
                             match except_child.kind() {
                                 "identifier" | "as_pattern" => {
-                                    catch_var = Some(except_child.utf8_text(source.as_bytes()).unwrap_or("").to_string());
+                                    catch_var = Some(
+                                        except_child
+                                            .utf8_text(source.as_bytes())
+                                            .unwrap_or("")
+                                            .to_string(),
+                                    );
                                 }
                                 "block" => {
-                                    catch_block = Some(Box::new(parse_py_block(except_child, source)));
+                                    catch_block =
+                                        Some(Box::new(parse_py_block(except_child, source)));
                                 }
                                 _ => {}
                             }
@@ -1954,7 +2137,11 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                 }
             }
             AstNode::Try {
-                try_block: try_block.unwrap_or(Box::new(AstNode::Block { statements: vec![], result: None, span: node_span(node) })),
+                try_block: try_block.unwrap_or(Box::new(AstNode::Block {
+                    statements: vec![],
+                    result: None,
+                    span: node_span(node),
+                })),
                 catch_var,
                 catch_block,
                 finally_block,
@@ -1967,19 +2154,32 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
             if children.len() >= 3 {
                 let target = Box::new(parse_py_expr(children[0], source));
                 let value = Box::new(parse_py_expr(children[children.len() - 1], source));
-                AstNode::Assign { target, value, span: node_span(node) }
+                AstNode::Assign {
+                    target,
+                    value,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "assignment_incomplete".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "assignment_incomplete".into(),
+                    span: node_span(node),
+                }
             }
         }
         "await" => {
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() != "await" {
-                    return AstNode::Await { expr: Box::new(parse_py_expr(child, source)), span: node_span(node) };
+                    return AstNode::Await {
+                        expr: Box::new(parse_py_expr(child, source)),
+                        span: node_span(node),
+                    };
                 }
             }
-            AstNode::Unknown { kind: "await_empty".into(), span: node_span(node) }
+            AstNode::Unknown {
+                kind: "await_empty".into(),
+                span: node_span(node),
+            }
         }
         "lambda" => {
             let mut params = Vec::new();
@@ -1991,7 +2191,12 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
                         let mut param_cursor = child.walk();
                         for param_child in child.children(&mut param_cursor) {
                             if param_child.kind() == "identifier" {
-                                params.push(param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string());
+                                params.push(
+                                    param_child
+                                        .utf8_text(source.as_bytes())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                );
                             }
                         }
                     }
@@ -2003,7 +2208,10 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
             }
             AstNode::Closure {
                 params,
-                body: body.unwrap_or(Box::new(AstNode::Literal { value: LiteralValue::Unit, span: node_span(node) })),
+                body: body.unwrap_or(Box::new(AstNode::Literal {
+                    value: LiteralValue::Unit,
+                    span: node_span(node),
+                })),
                 span: node_span(node),
             }
         }
@@ -2022,7 +2230,7 @@ fn parse_py_expr(node: Node, source: &str) -> AstNode {
 pub fn parse_go(source: &str) -> Result<CodeAst> {
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_go::language())
+        .set_language(&tree_sitter_go::LANGUAGE.into())
         .map_err(|e| Error::CodeParse(format!("Failed to set language: {}", e)))?;
 
     let tree = parser
@@ -2107,10 +2315,16 @@ fn parse_go_parameters(node: Node, source: &str) -> Vec<Parameter> {
             for param_child in child.children(&mut param_cursor) {
                 match param_child.kind() {
                     "identifier" => {
-                        name = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                        name = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
                     "type_identifier" | "qualified_type" | "pointer_type" | "slice_type" => {
-                        typ = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                        typ = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
                     _ => {}
                 }
@@ -2131,7 +2345,9 @@ fn parse_go_block(node: Node, source: &str) -> AstNode {
     let mut cursor = node.walk();
 
     let children: Vec<_> = node.children(&mut cursor).collect();
-    let last_stmt_idx = children.iter().rposition(|c| c.kind() != "{" && c.kind() != "}");
+    let last_stmt_idx = children
+        .iter()
+        .rposition(|c| c.kind() != "{" && c.kind() != "}");
 
     for (i, child) in children.iter().enumerate() {
         let is_last = Some(i) == last_stmt_idx;
@@ -2277,11 +2493,24 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
                     ">=" => BinaryOp::Ge,
                     "&&" => BinaryOp::And,
                     "||" => BinaryOp::Or,
-                    _ => return AstNode::Unknown { kind: format!("unknown_op:{}", op_text), span: node_span(node) },
+                    _ => {
+                        return AstNode::Unknown {
+                            kind: format!("unknown_op:{}", op_text),
+                            span: node_span(node),
+                        }
+                    }
                 };
-                AstNode::Binary { op, left, right, span: node_span(node) }
+                AstNode::Binary {
+                    op,
+                    left,
+                    right,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "binary_incomplete".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "binary_incomplete".into(),
+                    span: node_span(node),
+                }
             }
         }
         "parenthesized_expression" => {
@@ -2291,17 +2520,31 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
                     return parse_go_expr(child, source);
                 }
             }
-            AstNode::Unknown { kind: "empty_parens".into(), span: node_span(node) }
+            AstNode::Unknown {
+                kind: "empty_parens".into(),
+                span: node_span(node),
+            }
         }
         "selector_expression" => {
             let mut cursor = node.walk();
             let children: Vec<_> = node.children(&mut cursor).collect();
             if children.len() >= 2 {
                 let object = Box::new(parse_go_expr(children[0], source));
-                let field = children.last().and_then(|n| n.utf8_text(source.as_bytes()).ok()).unwrap_or("").to_string();
-                AstNode::Field { object, field, span: node_span(node) }
+                let field = children
+                    .last()
+                    .and_then(|n| n.utf8_text(source.as_bytes()).ok())
+                    .unwrap_or("")
+                    .to_string();
+                AstNode::Field {
+                    object,
+                    field,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "selector_expression".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "selector_expression".into(),
+                    span: node_span(node),
+                }
             }
         }
         "for_statement" => {
@@ -2321,7 +2564,10 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
                                 for decl_child in clause_child.children(&mut decl_cursor) {
                                     if decl_child.kind() == "expression_list" {
                                         if let Some(id) = decl_child.child(0) {
-                                            counter = id.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                                            counter = id
+                                                .utf8_text(source.as_bytes())
+                                                .unwrap_or("")
+                                                .to_string();
                                         }
                                     }
                                 }
@@ -2334,9 +2580,13 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
                         for range_child in child.children(&mut range_cursor) {
                             if range_child.kind() == "expression_list" {
                                 if let Some(id) = range_child.child(0) {
-                                    counter = id.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                                    counter =
+                                        id.utf8_text(source.as_bytes()).unwrap_or("").to_string();
                                 }
-                            } else if range_child.kind() != "range" && range_child.kind() != ":=" && range_child.kind() != "," {
+                            } else if range_child.kind() != "range"
+                                && range_child.kind() != ":="
+                                && range_child.kind() != ","
+                            {
                                 collection = Some(Box::new(parse_go_expr(range_child, source)));
                             }
                         }
@@ -2352,11 +2602,18 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
                     item: counter,
                     index: None,
                     collection: coll,
-                    body: body.unwrap_or(Box::new(AstNode::Block { statements: vec![], result: None, span: node_span(node) })),
+                    body: body.unwrap_or(Box::new(AstNode::Block {
+                        statements: vec![],
+                        result: None,
+                        span: node_span(node),
+                    })),
                     span: node_span(node),
                 }
             } else {
-                AstNode::Unknown { kind: "for_statement".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "for_statement".into(),
+                    span: node_span(node),
+                }
             }
         }
         "assignment_statement" => {
@@ -2365,9 +2622,16 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
             if children.len() >= 3 {
                 let target = Box::new(parse_go_expr(children[0], source));
                 let value = Box::new(parse_go_expr(children[children.len() - 1], source));
-                AstNode::Assign { target, value, span: node_span(node) }
+                AstNode::Assign {
+                    target,
+                    value,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "assignment_incomplete".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "assignment_incomplete".into(),
+                    span: node_span(node),
+                }
             }
         }
         "func_literal" => {
@@ -2383,7 +2647,12 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
                                 let mut decl_cursor = param_child.walk();
                                 for decl_child in param_child.children(&mut decl_cursor) {
                                     if decl_child.kind() == "identifier" {
-                                        params.push(decl_child.utf8_text(source.as_bytes()).unwrap_or("").to_string());
+                                        params.push(
+                                            decl_child
+                                                .utf8_text(source.as_bytes())
+                                                .unwrap_or("")
+                                                .to_string(),
+                                        );
                                     }
                                 }
                             }
@@ -2397,7 +2666,10 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
             }
             AstNode::Closure {
                 params,
-                body: body.unwrap_or(Box::new(AstNode::Literal { value: LiteralValue::Unit, span: node_span(node) })),
+                body: body.unwrap_or(Box::new(AstNode::Literal {
+                    value: LiteralValue::Unit,
+                    span: node_span(node),
+                })),
                 span: node_span(node),
             }
         }
@@ -2416,7 +2688,7 @@ fn parse_go_expr(node: Node, source: &str) -> AstNode {
 pub fn parse_csharp(source: &str) -> Result<CodeAst> {
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_c_sharp::language())
+        .set_language(&tree_sitter_c_sharp::LANGUAGE.into())
         .map_err(|e| Error::CodeParse(format!("Failed to set language: {}", e)))?;
 
     let tree = parser
@@ -2467,7 +2739,9 @@ fn parse_cs_method(node: Node, source: &str) -> Option<Function> {
             "parameter_list" => {
                 params = parse_cs_parameters(child, source);
             }
-            "predefined_type" | "identifier" | "generic_name" if return_type.is_none() && !name.is_empty() => {
+            "predefined_type" | "identifier" | "generic_name"
+                if return_type.is_none() && !name.is_empty() =>
+            {
                 // Already have name, this might be return type (handled separately)
             }
             "block" => {
@@ -2519,10 +2793,16 @@ fn parse_cs_parameters(node: Node, source: &str) -> Vec<Parameter> {
             for param_child in child.children(&mut param_cursor) {
                 match param_child.kind() {
                     "identifier" => {
-                        name = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                        name = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
-                    "predefined_type" | "nullable_type" | "generic_name" | "identifier" if typ.is_empty() => {
-                        typ = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                    "predefined_type" | "nullable_type" | "generic_name" if typ.is_empty() => {
+                        typ = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
                     _ => {}
                 }
@@ -2543,7 +2823,9 @@ fn parse_cs_block(node: Node, source: &str) -> AstNode {
     let mut cursor = node.walk();
 
     let children: Vec<_> = node.children(&mut cursor).collect();
-    let last_stmt_idx = children.iter().rposition(|c| c.kind() != "{" && c.kind() != "}");
+    let last_stmt_idx = children
+        .iter()
+        .rposition(|c| c.kind() != "{" && c.kind() != "}");
 
     for (i, child) in children.iter().enumerate() {
         let is_last = Some(i) == last_stmt_idx;
@@ -2593,7 +2875,12 @@ fn parse_cs_let(node: Node, source: &str) -> AstNode {
     let mut name = String::new();
     let mut value = None;
 
-    fn find_declarator(node: Node, source: &str, name: &mut String, value: &mut Option<Box<AstNode>>) {
+    fn find_declarator(
+        node: Node,
+        source: &str,
+        name: &mut String,
+        value: &mut Option<Box<AstNode>>,
+    ) {
         if node.kind() == "variable_declarator" {
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
@@ -2685,7 +2972,10 @@ fn parse_cs_expr(node: Node, source: &str) -> AstNode {
     match node.kind() {
         "integer_literal" => {
             let text = node.utf8_text(source.as_bytes()).unwrap_or("0");
-            let value = text.trim_end_matches(|c: char| c.is_alphabetic()).parse().unwrap_or(0);
+            let value = text
+                .trim_end_matches(|c: char| c.is_alphabetic())
+                .parse()
+                .unwrap_or(0);
             AstNode::Literal {
                 value: LiteralValue::Int(value),
                 span: node_span(node),
@@ -2693,7 +2983,10 @@ fn parse_cs_expr(node: Node, source: &str) -> AstNode {
         }
         "real_literal" => {
             let text = node.utf8_text(source.as_bytes()).unwrap_or("0.0");
-            let value = text.trim_end_matches(|c: char| c.is_alphabetic()).parse().unwrap_or(0.0);
+            let value = text
+                .trim_end_matches(|c: char| c.is_alphabetic())
+                .parse()
+                .unwrap_or(0.0);
             AstNode::Literal {
                 value: LiteralValue::Float(value),
                 span: node_span(node),
@@ -2739,11 +3032,24 @@ fn parse_cs_expr(node: Node, source: &str) -> AstNode {
                     ">=" => BinaryOp::Ge,
                     "&&" => BinaryOp::And,
                     "||" => BinaryOp::Or,
-                    _ => return AstNode::Unknown { kind: format!("unknown_op:{}", op_text), span: node_span(node) },
+                    _ => {
+                        return AstNode::Unknown {
+                            kind: format!("unknown_op:{}", op_text),
+                            span: node_span(node),
+                        }
+                    }
                 };
-                AstNode::Binary { op, left, right, span: node_span(node) }
+                AstNode::Binary {
+                    op,
+                    left,
+                    right,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "binary_incomplete".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "binary_incomplete".into(),
+                    span: node_span(node),
+                }
             }
         }
         "parenthesized_expression" => {
@@ -2753,17 +3059,31 @@ fn parse_cs_expr(node: Node, source: &str) -> AstNode {
                     return parse_cs_expr(child, source);
                 }
             }
-            AstNode::Unknown { kind: "empty_parens".into(), span: node_span(node) }
+            AstNode::Unknown {
+                kind: "empty_parens".into(),
+                span: node_span(node),
+            }
         }
         "member_access_expression" => {
             let mut cursor = node.walk();
             let children: Vec<_> = node.children(&mut cursor).collect();
             if children.len() >= 2 {
                 let object = Box::new(parse_cs_expr(children[0], source));
-                let field = children.last().and_then(|n| n.utf8_text(source.as_bytes()).ok()).unwrap_or("").to_string();
-                AstNode::Field { object, field, span: node_span(node) }
+                let field = children
+                    .last()
+                    .and_then(|n| n.utf8_text(source.as_bytes()).ok())
+                    .unwrap_or("")
+                    .to_string();
+                AstNode::Field {
+                    object,
+                    field,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "member_access".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "member_access".into(),
+                    span: node_span(node),
+                }
             }
         }
         _ => AstNode::Unknown {
@@ -2781,7 +3101,7 @@ fn parse_cs_expr(node: Node, source: &str) -> AstNode {
 pub fn parse_java(source: &str) -> Result<CodeAst> {
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_java::language())
+        .set_language(&tree_sitter_java::LANGUAGE.into())
         .map_err(|e| Error::CodeParse(format!("Failed to set language: {}", e)))?;
 
     let tree = parser
@@ -2832,7 +3152,11 @@ fn parse_java_method(node: Node, source: &str) -> Option<Function> {
             "formal_parameters" => {
                 params = parse_java_parameters(child, source);
             }
-            "void_type" | "integral_type" | "floating_point_type" | "boolean_type" | "type_identifier" => {
+            "void_type"
+            | "integral_type"
+            | "floating_point_type"
+            | "boolean_type"
+            | "type_identifier" => {
                 return_type = Some(child.utf8_text(source.as_bytes()).unwrap_or("").to_string());
             }
             "block" => {
@@ -2872,10 +3196,20 @@ fn parse_java_parameters(node: Node, source: &str) -> Vec<Parameter> {
             for param_child in child.children(&mut param_cursor) {
                 match param_child.kind() {
                     "identifier" => {
-                        name = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                        name = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
-                    "integral_type" | "floating_point_type" | "boolean_type" | "type_identifier" | "generic_type" => {
-                        typ = param_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                    "integral_type"
+                    | "floating_point_type"
+                    | "boolean_type"
+                    | "type_identifier"
+                    | "generic_type" => {
+                        typ = param_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
                     _ => {}
                 }
@@ -2896,7 +3230,9 @@ fn parse_java_block(node: Node, source: &str) -> AstNode {
     let mut cursor = node.walk();
 
     let children: Vec<_> = node.children(&mut cursor).collect();
-    let last_stmt_idx = children.iter().rposition(|c| c.kind() != "{" && c.kind() != "}");
+    let last_stmt_idx = children
+        .iter()
+        .rposition(|c| c.kind() != "{" && c.kind() != "}");
 
     for (i, child) in children.iter().enumerate() {
         let is_last = Some(i) == last_stmt_idx;
@@ -2953,9 +3289,15 @@ fn parse_java_let(node: Node, source: &str) -> AstNode {
             for decl_child in child.children(&mut decl_cursor) {
                 match decl_child.kind() {
                     "identifier" => {
-                        name = decl_child.utf8_text(source.as_bytes()).unwrap_or("").to_string();
+                        name = decl_child
+                            .utf8_text(source.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
                     }
-                    _ if value.is_none() && decl_child.kind() != "=" && decl_child.kind() != "dimensions" => {
+                    _ if value.is_none()
+                        && decl_child.kind() != "="
+                        && decl_child.kind() != "dimensions" =>
+                    {
                         value = Some(Box::new(parse_java_expr(decl_child, source)));
                     }
                     _ => {}
@@ -3022,7 +3364,10 @@ fn parse_java_expr(node: Node, source: &str) -> AstNode {
     match node.kind() {
         "decimal_integer_literal" | "hex_integer_literal" | "octal_integer_literal" => {
             let text = node.utf8_text(source.as_bytes()).unwrap_or("0");
-            let value = text.trim_end_matches(|c: char| c.is_alphabetic()).parse().unwrap_or(0);
+            let value = text
+                .trim_end_matches(|c: char| c.is_alphabetic())
+                .parse()
+                .unwrap_or(0);
             AstNode::Literal {
                 value: LiteralValue::Int(value),
                 span: node_span(node),
@@ -3030,7 +3375,10 @@ fn parse_java_expr(node: Node, source: &str) -> AstNode {
         }
         "decimal_floating_point_literal" | "hex_floating_point_literal" => {
             let text = node.utf8_text(source.as_bytes()).unwrap_or("0.0");
-            let value = text.trim_end_matches(|c: char| c.is_alphabetic()).parse().unwrap_or(0.0);
+            let value = text
+                .trim_end_matches(|c: char| c.is_alphabetic())
+                .parse()
+                .unwrap_or(0.0);
             AstNode::Literal {
                 value: LiteralValue::Float(value),
                 span: node_span(node),
@@ -3077,11 +3425,24 @@ fn parse_java_expr(node: Node, source: &str) -> AstNode {
                     ">=" => BinaryOp::Ge,
                     "&&" => BinaryOp::And,
                     "||" => BinaryOp::Or,
-                    _ => return AstNode::Unknown { kind: format!("unknown_op:{}", op_text), span: node_span(node) },
+                    _ => {
+                        return AstNode::Unknown {
+                            kind: format!("unknown_op:{}", op_text),
+                            span: node_span(node),
+                        }
+                    }
                 };
-                AstNode::Binary { op, left, right, span: node_span(node) }
+                AstNode::Binary {
+                    op,
+                    left,
+                    right,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "binary_incomplete".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "binary_incomplete".into(),
+                    span: node_span(node),
+                }
             }
         }
         "parenthesized_expression" => {
@@ -3091,17 +3452,31 @@ fn parse_java_expr(node: Node, source: &str) -> AstNode {
                     return parse_java_expr(child, source);
                 }
             }
-            AstNode::Unknown { kind: "empty_parens".into(), span: node_span(node) }
+            AstNode::Unknown {
+                kind: "empty_parens".into(),
+                span: node_span(node),
+            }
         }
         "field_access" => {
             let mut cursor = node.walk();
             let children: Vec<_> = node.children(&mut cursor).collect();
             if children.len() >= 2 {
                 let object = Box::new(parse_java_expr(children[0], source));
-                let field = children.last().and_then(|n| n.utf8_text(source.as_bytes()).ok()).unwrap_or("").to_string();
-                AstNode::Field { object, field, span: node_span(node) }
+                let field = children
+                    .last()
+                    .and_then(|n| n.utf8_text(source.as_bytes()).ok())
+                    .unwrap_or("")
+                    .to_string();
+                AstNode::Field {
+                    object,
+                    field,
+                    span: node_span(node),
+                }
             } else {
-                AstNode::Unknown { kind: "field_access".into(), span: node_span(node) }
+                AstNode::Unknown {
+                    kind: "field_access".into(),
+                    span: node_span(node),
+                }
             }
         }
         _ => AstNode::Unknown {

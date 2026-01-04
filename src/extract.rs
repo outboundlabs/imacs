@@ -14,6 +14,7 @@ pub fn extract(code: &CodeAst) -> ExtractedSpec {
 
 /// Spec extractor
 pub struct Extractor {
+    #[allow(dead_code)]
     config: ExtractorConfig,
 }
 
@@ -181,6 +182,7 @@ impl Extractor {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn extract_rules(
         &self,
         node: &AstNode,
@@ -189,7 +191,7 @@ impl Extractor {
         rules: &mut Vec<Rule>,
         counter: &mut usize,
         confidences: &mut Vec<RuleConfidence>,
-        warnings: &mut Vec<String>,
+        _warnings: &mut Vec<String>,
     ) {
         match node {
             AstNode::Match { arms, .. } => {
@@ -286,7 +288,7 @@ impl Extractor {
                         rules,
                         counter,
                         confidences,
-                        warnings,
+                        _warnings,
                     );
                 }
 
@@ -301,23 +303,24 @@ impl Extractor {
                         rules,
                         counter,
                         confidences,
-                        warnings,
+                        _warnings,
                     );
                 }
             }
 
-            AstNode::Block { result, .. } => {
-                if let Some(inner) = result {
-                    self.extract_rules(
-                        inner,
-                        inputs,
-                        current_conditions,
-                        rules,
-                        counter,
-                        confidences,
-                        warnings,
-                    );
-                }
+            AstNode::Block {
+                result: Some(inner),
+                ..
+            } => {
+                self.extract_rules(
+                    inner,
+                    inputs,
+                    current_conditions,
+                    rules,
+                    counter,
+                    confidences,
+                    _warnings,
+                );
             }
 
             AstNode::Return {
