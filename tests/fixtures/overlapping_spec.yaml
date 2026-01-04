@@ -1,0 +1,20 @@
+id: overlapping_spec
+name: Overlapping Rules Spec
+inputs:
+  - name: x
+    type: bool
+outputs:
+  - name: result
+    type: int
+rules:
+  - id: R1
+    when: "x"
+    then: 1
+    priority: 0
+    description: "First rule for x"
+  - id: R2
+    when: "x"
+    then: 2
+    priority: 1
+    description: "Second rule for x (overlaps with R1)"
+

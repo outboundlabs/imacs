@@ -188,6 +188,17 @@ impl Cover {
         result
     }
 
+    /// Check if this cover covers a specific minterm (input combination)
+    /// minterm is a bitmask where bit i represents the value of variable i
+    pub fn covers_minterm(&self, minterm: u64) -> bool {
+        for cube in &self.cubes {
+            if cube.covers_minterm(minterm) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Compute the complement of this cover using Shannon expansion
     pub fn complement(&self) -> Cover {
         self.complement_with_depth(0)

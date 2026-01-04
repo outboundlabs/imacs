@@ -5,6 +5,7 @@
 
 use crate::ast::*;
 use crate::spec::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Extract spec from code AST
@@ -34,7 +35,7 @@ impl Default for ExtractorConfig {
 }
 
 /// Result of extraction
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedSpec {
     /// The extracted spec
     pub spec: Spec,
@@ -47,7 +48,7 @@ pub struct ExtractedSpec {
 }
 
 /// Confidence levels
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Confidence {
     /// Overall confidence
     pub overall: f32,
@@ -55,7 +56,7 @@ pub struct Confidence {
     pub rules: Vec<RuleConfidence>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RuleConfidence {
     pub rule_id: String,
     pub confidence: f32,

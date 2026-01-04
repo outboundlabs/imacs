@@ -5,6 +5,7 @@
 
 use crate::ast::*;
 use crate::spec::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -37,7 +38,7 @@ impl Default for VerifierConfig {
 }
 
 /// Result of verification
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VerificationResult {
     /// Whether verification passed
     pub passed: bool,
@@ -54,7 +55,7 @@ pub struct VerificationResult {
 }
 
 /// Coverage statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Coverage {
     pub total: usize,
     pub covered: usize,
@@ -64,7 +65,7 @@ pub struct Coverage {
 }
 
 /// A gap in coverage
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CoverageGap {
     pub rule_id: String,
     pub reason: GapReason,
@@ -73,7 +74,7 @@ pub struct CoverageGap {
     pub suggestion: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum GapReason {
     Missing,
     ConditionMismatch,

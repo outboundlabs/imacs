@@ -1,3 +1,16 @@
+// Production-quality lints
+#![warn(
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::dbg_macro,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
+// Deny truly dangerous patterns
+#![deny(clippy::mem_forget)]
+// Allow common patterns in library code
+#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+
 //! # IMACS — Intelligent Model-Assisted Code Synthesis
 //!
 //! Spec-driven code verification, generation, and testing.
@@ -159,7 +172,10 @@
 // Core modules (Layer 0: hand-crafted bootstrap)
 pub mod ast;
 pub mod cel;
+pub mod config;
 pub mod error;
+pub mod meta;
+pub mod project;
 pub mod spec;
 
 // Operations (Layer 0: hand-crafted)
@@ -207,6 +223,7 @@ pub use format::{
 // Completeness analysis
 pub use completeness::{
     analyze_completeness,
+    analyze_suite,
     compose,
     cover_to_cel,
     cube_to_cel,
@@ -219,6 +236,8 @@ pub use completeness::{
     minimize,
     minimize_rules,
     rules_to_cover,
+    validate_spec,
+    AnalysisMode,
     ChainDefinition,
     ComparisonOp,
     ComposedSpec,
@@ -238,9 +257,13 @@ pub use completeness::{
     PredicateSet,
     PredicateValue,
     RuleOverlap,
+    SpecResult,
     StringOpKind,
+    SuiteAnalysisResult,
+    SuiteGap,
     Transformation,
     TransformationKind,
+    ValidationReport,
     VariableGroup,
 };
 // Re-export predicate LiteralValue under a distinct name to avoid conflict with ast::LiteralValue
@@ -253,6 +276,15 @@ pub use orchestrate::{
 };
 pub use testgen_orchestrate::{
     generate_orchestrator_tests, verify_orchestrator, OrchestratorTests, OrchestratorVerification,
+};
+
+// Project management
+pub use config::{ImacRoot, LocalConfig, MergedConfig, ProjectConfig, ValidationConfig};
+pub use meta::{create_meta, find_stale_specs, ImacMeta};
+pub use project::{
+    discover_all_imacs, discover_generated_dir, discover_specs_dir, find_root,
+    get_generated_dir, list_specs, load_project_structure, validate_unique_ids, ImacFolder,
+    ProjectStructure,
 };
 
 /// Library version

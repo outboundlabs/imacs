@@ -6,6 +6,7 @@
 //! - Recommend extraction targets
 
 use crate::ast::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Analyze code AST
@@ -39,7 +40,7 @@ impl Default for AnalyzerConfig {
 }
 
 /// Analysis report
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AnalysisReport {
     pub functions: Vec<FunctionAnalysis>,
     pub overall: OverallMetrics,
@@ -48,7 +49,7 @@ pub struct AnalysisReport {
 }
 
 /// Analysis of a single function
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FunctionAnalysis {
     pub name: String,
     pub metrics: FunctionMetrics,
@@ -56,7 +57,7 @@ pub struct FunctionAnalysis {
 }
 
 /// Metrics for a function
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FunctionMetrics {
     pub lines: usize,
     pub cyclomatic_complexity: usize,
@@ -67,7 +68,7 @@ pub struct FunctionMetrics {
 }
 
 /// Overall file metrics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct OverallMetrics {
     pub total_lines: usize,
     pub total_functions: usize,
@@ -77,7 +78,7 @@ pub struct OverallMetrics {
 }
 
 /// An issue found in code
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Issue {
     pub kind: IssueKind,
     pub severity: Severity,
@@ -86,7 +87,7 @@ pub struct Issue {
     pub suggestion: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub enum IssueKind {
     HighComplexity,
     DeepNesting,
@@ -96,7 +97,7 @@ pub enum IssueKind {
     MissingDefault,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub enum Severity {
     Info,
     Warning,
@@ -114,7 +115,7 @@ impl std::fmt::Display for Severity {
 }
 
 /// Recommendation for improvement
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum Recommendation {
     ExtractSpec {
         function: String,

@@ -1,0 +1,21 @@
+id: incomplete_spec
+name: Incomplete Boolean Spec
+inputs:
+  - name: a
+    type: bool
+  - name: b
+    type: bool
+outputs:
+  - name: result
+    type: int
+rules:
+  - id: R1
+    when: "a && b"
+    then: 1
+    description: "Both true"
+  - id: R2
+    when: "a && !b"
+    then: 2
+    description: "A true, B false"
+  # Missing: !a && b and !a && !b
+

@@ -1,0 +1,28 @@
+id: complete_spec
+name: Complete Boolean Spec
+inputs:
+  - name: a
+    type: bool
+  - name: b
+    type: bool
+outputs:
+  - name: result
+    type: int
+rules:
+  - id: R1
+    when: "a && b"
+    then: 1
+    description: "Both true"
+  - id: R2
+    when: "a && !b"
+    then: 2
+    description: "A true, B false"
+  - id: R3
+    when: "!a && b"
+    then: 3
+    description: "A false, B true"
+  - id: R4
+    when: "!a && !b"
+    then: 4
+    description: "Both false"
+

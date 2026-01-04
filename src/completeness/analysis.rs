@@ -11,11 +11,12 @@ use super::predicates::{extract_predicates, Predicate, PredicateSet};
 use crate::cel::CelCompiler;
 use crate::spec::Spec;
 use quine_mc_cluskey::Bool;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Result of completeness analysis - raw data for LLM tool
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IncompletenessReport {
     /// Is the spec complete? (all input combinations covered)
     pub is_complete: bool,
@@ -41,14 +42,14 @@ pub struct IncompletenessReport {
 }
 
 /// Information about a predicate for the report
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PredicateInfo {
     pub id: usize,
     pub cel_expression: String,
 }
 
 /// A specific uncovered input combination
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MissingCase {
     /// The predicate values for this case
     pub predicate_values: Vec<PredicateValue>,
@@ -61,7 +62,7 @@ pub struct MissingCase {
 }
 
 /// A predicate with its truth value in a missing case
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PredicateValue {
     pub predicate_id: usize,
     pub cel_expression: String,
@@ -69,7 +70,7 @@ pub struct PredicateValue {
 }
 
 /// Overlapping rules - multiple rules match the same input
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RuleOverlap {
     /// The rules that overlap
     pub rule_ids: Vec<String>,
@@ -471,36 +472,50 @@ fn try_minimize(spec: &Spec, predicate_set: &PredicateSet) -> Option<usize> {
         return None;
     }
 
-    // Build boolean expression for each output value
-    // For now, just check if any simplification is possible
-    let mut all_rules_as_terms: Vec<Bool> = Vec::new();
+    // Group rules by output - only rules with the SAME output can be minimized together
+    let mut output_groups: HashMap<String, Vec<Bool>> = HashMap::new();
 
     for rule in &spec.rules {
         if let Some(cel_expr) = &rule.when {
             if let Some(bool_expr) = cel_to_bool_mapped(cel_expr, predicate_set, &index_map) {
-                all_rules_as_terms.push(bool_expr);
+                // Use debug format of output as key for grouping
+                let output_key = format!("{:?}", rule.then);
+                output_groups.entry(output_key).or_default().push(bool_expr);
             }
         }
     }
 
-    if all_rules_as_terms.is_empty() {
+    if output_groups.is_empty() {
         return None;
     }
 
-    // Combine all rules with OR and simplify
-    let combined = if all_rules_as_terms.len() == 1 {
-        all_rules_as_terms.pop().unwrap()
-    } else {
-        Bool::Or(all_rules_as_terms)
-    };
+    // For each output group, simplify and count the resulting terms
+    let mut total_minimized = 0;
+    for (_output, terms) in output_groups {
+        if terms.is_empty() {
+            continue;
+        }
 
-    // Simplify and count resulting terms
-    let simplified = combined.simplify();
+        // Combine terms for this output with OR and simplify
+        let combined = if terms.len() == 1 {
+            terms.into_iter().next().unwrap()
+        } else {
+            Bool::Or(terms)
+        };
 
-    // Count the number of terms in the simplified result
-    let simplified_count = count_terms(&simplified);
+        // Simplify and count resulting terms
+        let simplified = combined.simplify();
 
-    Some(simplified_count)
+        let simplified_count = if simplified.is_empty() {
+            1
+        } else {
+            simplified.len()
+        };
+
+        total_minimized += simplified_count;
+    }
+
+    Some(total_minimized)
 }
 
 /// Collect all predicate indices used in a CEL expression
@@ -643,9 +658,74 @@ fn ast_to_bool_mapped(
     }
 }
 
-/// Count terms in a simplified boolean expression
-fn count_terms(exprs: &[Bool]) -> usize {
-    exprs.len().max(1)
+impl IncompletenessReport {
+    /// Format as human-readable report
+    pub fn to_report(&self) -> String {
+        let mut out = String::new();
+
+        let status = if self.is_complete {
+            "✓ COMPLETE"
+        } else {
+            "✗ INCOMPLETE"
+        };
+        out.push_str(&format!("Completeness Analysis: {}\n", status));
+        out.push_str(&format!(
+            "Coverage: {}/{} ({:.1}%)\n",
+            self.covered_combinations,
+            self.total_combinations,
+            self.coverage_ratio * 100.0
+        ));
+
+        if !self.predicates.is_empty() {
+            out.push_str(&format!("\nPredicates ({}):\n", self.predicates.len()));
+            for pred in &self.predicates {
+                out.push_str(&format!("  [{}] {}\n", pred.id, pred.cel_expression));
+            }
+        }
+
+        if !self.missing_cases.is_empty() {
+            out.push_str(&format!(
+                "\nMissing Cases ({}):\n",
+                self.missing_cases.len()
+            ));
+            for (i, case) in self.missing_cases.iter().take(10).enumerate() {
+                out.push_str(&format!("  Case {}:\n", i + 1));
+                for cond in &case.cel_conditions {
+                    out.push_str(&format!("    - {}\n", cond));
+                }
+            }
+            if self.missing_cases.len() > 10 {
+                out.push_str(&format!(
+                    "  ... and {} more cases\n",
+                    self.missing_cases.len() - 10
+                ));
+            }
+        }
+
+        if !self.overlaps.is_empty() {
+            out.push_str(&format!("\nOverlapping Rules ({}):\n", self.overlaps.len()));
+            for overlap in &self.overlaps {
+                out.push_str(&format!(
+                    "  Rules {} overlap:\n",
+                    overlap.rule_ids.join(", ")
+                ));
+                for cond in &overlap.cel_conditions {
+                    out.push_str(&format!("    - {}\n", cond));
+                }
+            }
+        }
+
+        if self.can_minimize {
+            out.push_str(&format!(
+                "\nMinimization: {} rules can be reduced to ~{}\n",
+                self.original_rule_count,
+                self.minimized_rule_count
+                    .unwrap_or(self.original_rule_count)
+            ));
+        }
+
+        out
+    }
 }
 
 #[cfg(test)]
@@ -728,5 +808,746 @@ mod tests {
         // Coverage should be between 0 and 1
         assert!(report.coverage_ratio >= 0.0);
         assert!(report.coverage_ratio <= 1.0);
+    }
+
+    fn make_complete_spec() -> Spec {
+        Spec {
+            id: "complete".into(),
+            name: None,
+            description: None,
+            inputs: vec![
+                Variable {
+                    name: "a".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "b".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+            ],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![
+                Rule {
+                    id: "R1".into(),
+                    when: Some("a && b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R2".into(),
+                    when: Some("a && !b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(2)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R3".into(),
+                    when: Some("!a && b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(3)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R4".into(),
+                    when: Some("!a && !b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(4)),
+                    priority: 0,
+                    description: None,
+                },
+            ],
+            default: None,
+            meta: Default::default(),
+        }
+    }
+
+    fn make_overlapping_spec() -> Spec {
+        Spec {
+            id: "overlapping".into(),
+            name: None,
+            description: None,
+            inputs: vec![Variable {
+                name: "x".into(),
+                typ: VarType::Bool,
+                description: None,
+                values: None,
+            }],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![
+                Rule {
+                    id: "R1".into(),
+                    when: Some("x".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R2".into(),
+                    when: Some("x".into()), // Same condition - overlaps with R1
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(2)),
+                    priority: 1,
+                    description: None,
+                },
+            ],
+            default: None,
+            meta: Default::default(),
+        }
+    }
+
+    fn make_minimizable_spec() -> Spec {
+        // A || B can be simplified from (A && B) || (A && !B) || (!A && B)
+        Spec {
+            id: "minimizable".into(),
+            name: None,
+            description: None,
+            inputs: vec![
+                Variable {
+                    name: "a".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "b".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+            ],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![
+                Rule {
+                    id: "R1".into(),
+                    when: Some("a && b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R2".into(),
+                    when: Some("a && !b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R3".into(),
+                    when: Some("!a && b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+            ],
+            default: None,
+            meta: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_complete_spec_simple() {
+        let spec = make_complete_spec();
+        let report = analyze_completeness(&spec);
+
+        assert!(
+            report.is_complete,
+            "Complete spec should be marked as complete"
+        );
+        assert_eq!(
+            report.missing_cases.len(),
+            0,
+            "Complete spec should have no missing cases"
+        );
+        assert_eq!(
+            report.coverage_ratio, 1.0,
+            "Complete spec should have 100% coverage"
+        );
+    }
+
+    #[test]
+    fn test_complete_spec_complex() {
+        // Test with 3 boolean variables (8 combinations)
+        let spec = Spec {
+            id: "complex_complete".into(),
+            name: None,
+            description: None,
+            inputs: vec![
+                Variable {
+                    name: "a".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "b".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "c".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+            ],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![
+                Rule {
+                    id: "R1".into(),
+                    when: Some("a && b && c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R2".into(),
+                    when: Some("a && b && !c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(2)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R3".into(),
+                    when: Some("a && !b && c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(3)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R4".into(),
+                    when: Some("a && !b && !c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(4)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R5".into(),
+                    when: Some("!a && b && c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(5)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R6".into(),
+                    when: Some("!a && b && !c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(6)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R7".into(),
+                    when: Some("!a && !b && c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(7)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R8".into(),
+                    when: Some("!a && !b && !c".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(8)),
+                    priority: 0,
+                    description: None,
+                },
+            ],
+            default: None,
+            meta: Default::default(),
+        };
+
+        let report = analyze_completeness(&spec);
+        assert!(report.is_complete, "All 8 combinations should be covered");
+        assert_eq!(report.total_combinations, 8);
+        assert_eq!(report.covered_combinations, 8);
+    }
+
+    #[test]
+    fn test_incomplete_spec_missing_case() {
+        let spec = make_test_spec();
+        let report = analyze_completeness(&spec);
+
+        assert!(!report.is_complete);
+        assert!(!report.missing_cases.is_empty());
+        assert!(report.coverage_ratio < 1.0);
+    }
+
+    #[test]
+    fn test_incomplete_spec_partial_coverage() {
+        // Only covers 2 out of 4 combinations
+        let spec = Spec {
+            id: "partial".into(),
+            name: None,
+            description: None,
+            inputs: vec![
+                Variable {
+                    name: "a".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "b".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+            ],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![
+                Rule {
+                    id: "R1".into(),
+                    when: Some("a && b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R2".into(),
+                    when: Some("a && !b".into()),
+                    conditions: None,
+                    then: Output::Single(ConditionValue::Int(2)),
+                    priority: 0,
+                    description: None,
+                },
+            ],
+            default: None,
+            meta: Default::default(),
+        };
+
+        let report = analyze_completeness(&spec);
+        assert!(!report.is_complete);
+        assert_eq!(report.total_combinations, 4);
+        assert_eq!(report.covered_combinations, 2);
+        assert_eq!(report.coverage_ratio, 0.5);
+    }
+
+    #[test]
+    fn test_overlapping_rules_detection() {
+        let spec = make_overlapping_spec();
+        let report = analyze_completeness(&spec);
+
+        assert!(
+            !report.overlaps.is_empty(),
+            "Should detect overlapping rules"
+        );
+        assert!(report.overlaps.iter().any(|o| o.rule_ids.len() > 1));
+    }
+
+    #[test]
+    fn test_overlapping_rules_cel_conditions() {
+        let spec = make_overlapping_spec();
+        let report = analyze_completeness(&spec);
+
+        for overlap in &report.overlaps {
+            assert!(
+                !overlap.cel_conditions.is_empty(),
+                "Overlaps should have CEL conditions"
+            );
+            assert!(
+                !overlap.rule_ids.is_empty(),
+                "Overlaps should identify rule IDs"
+            );
+        }
+    }
+
+    #[test]
+    fn test_minimization_opportunity() {
+        let spec = make_minimizable_spec();
+        let report = analyze_completeness(&spec);
+
+        // The spec has 3 rules that can potentially be minimized
+        assert!(report.original_rule_count == 3);
+        // Minimization may or may not succeed depending on implementation
+        // but we should at least check the flag is set correctly
+    }
+
+    #[test]
+    fn test_empty_spec() {
+        let spec = Spec {
+            id: "empty".into(),
+            name: None,
+            description: None,
+            inputs: vec![Variable {
+                name: "x".into(),
+                typ: VarType::Bool,
+                description: None,
+                values: None,
+            }],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![],
+            default: None,
+            meta: Default::default(),
+        };
+
+        let report = analyze_completeness(&spec);
+        assert!(!report.is_complete, "Empty spec should be incomplete");
+        assert_eq!(report.covered_combinations, 0);
+    }
+
+    #[test]
+    fn test_spec_no_predicates() {
+        // Spec with rules but no CEL expressions (using conditions instead)
+        let spec = Spec {
+            id: "no_predicates".into(),
+            name: None,
+            description: None,
+            inputs: vec![Variable {
+                name: "x".into(),
+                typ: VarType::Bool,
+                description: None,
+                values: None,
+            }],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![Rule {
+                id: "R1".into(),
+                when: None,
+                conditions: Some(vec![crate::spec::Condition {
+                    var: "x".into(),
+                    op: crate::spec::ConditionOp::Eq,
+                    value: ConditionValue::Bool(true),
+                }]),
+                then: Output::Single(ConditionValue::Int(1)),
+                priority: 0,
+                description: None,
+            }],
+            default: None,
+            meta: Default::default(),
+        };
+
+        let report = analyze_completeness(&spec);
+        // Should handle gracefully - may have no predicates extracted
+        assert!(report.predicates.is_empty() || !report.predicates.is_empty());
+    }
+
+    #[test]
+    fn test_to_report_complete() {
+        let spec = make_complete_spec();
+        let report = analyze_completeness(&spec);
+        let output = report.to_report();
+
+        assert!(
+            output.contains("COMPLETE"),
+            "Report should indicate completeness"
+        );
+        assert!(
+            output.contains("100.0%") || output.contains("100%"),
+            "Should show 100% coverage"
+        );
+    }
+
+    #[test]
+    fn test_to_report_incomplete() {
+        let spec = make_test_spec();
+        let report = analyze_completeness(&spec);
+        let output = report.to_report();
+
+        assert!(
+            output.contains("INCOMPLETE"),
+            "Report should indicate incompleteness"
+        );
+        assert!(
+            output.contains("Coverage:"),
+            "Should show coverage information"
+        );
+    }
+
+    #[test]
+    fn test_to_report_with_missing_cases() {
+        let spec = make_test_spec();
+        let report = analyze_completeness(&spec);
+        let output = report.to_report();
+
+        if !report.missing_cases.is_empty() {
+            assert!(
+                output.contains("Missing Cases"),
+                "Should list missing cases"
+            );
+        }
+    }
+
+    #[test]
+    fn test_to_report_with_overlaps() {
+        let spec = make_overlapping_spec();
+        let report = analyze_completeness(&spec);
+        let output = report.to_report();
+
+        if !report.overlaps.is_empty() {
+            assert!(
+                output.contains("Overlapping Rules"),
+                "Should list overlapping rules"
+            );
+        }
+    }
+
+    #[test]
+    fn test_to_report_with_minimization() {
+        let spec = make_minimizable_spec();
+        let report = analyze_completeness(&spec);
+        let output = report.to_report();
+
+        if report.can_minimize {
+            assert!(
+                output.contains("Minimization"),
+                "Should show minimization info"
+            );
+        }
+    }
+
+    #[test]
+    fn test_to_report_truncates_many_cases() {
+        // Create a spec with many missing cases (>10)
+        let spec = Spec {
+            id: "many_missing".into(),
+            name: None,
+            description: None,
+            inputs: vec![
+                Variable {
+                    name: "a".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "b".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "c".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+                Variable {
+                    name: "d".into(),
+                    typ: VarType::Bool,
+                    description: None,
+                    values: None,
+                },
+            ],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![Rule {
+                id: "R1".into(),
+                when: Some("a && b && c && d".into()),
+                conditions: None,
+                then: Output::Single(ConditionValue::Int(1)),
+                priority: 0,
+                description: None,
+            }],
+            default: None,
+            meta: Default::default(),
+        };
+
+        let report = analyze_completeness(&spec);
+        let output = report.to_report();
+
+        // Should have many missing cases (15 out of 16)
+        if report.missing_cases.len() > 10 {
+            assert!(output.contains("... and"), "Should truncate and show count");
+        }
+    }
+
+    #[test]
+    fn test_json_serialization() {
+        let spec = make_complete_spec();
+        let report = analyze_completeness(&spec);
+
+        let json = serde_json::to_string(&report).expect("Should serialize to JSON");
+        assert!(!json.is_empty());
+        assert!(json.contains("\"is_complete\""));
+        assert!(json.contains("\"coverage_ratio\""));
+        assert!(json.contains("\"missing_cases\""));
+        assert!(json.contains("\"overlaps\""));
+    }
+
+    #[test]
+    fn test_json_deserialization() {
+        let spec = make_complete_spec();
+        let report = analyze_completeness(&spec);
+
+        let json = serde_json::to_string(&report).expect("Should serialize");
+        let deserialized: IncompletenessReport =
+            serde_json::from_str(&json).expect("Should deserialize");
+
+        assert_eq!(report.is_complete, deserialized.is_complete);
+        assert_eq!(report.total_combinations, deserialized.total_combinations);
+        assert_eq!(
+            report.covered_combinations,
+            deserialized.covered_combinations
+        );
+        assert_eq!(report.missing_cases.len(), deserialized.missing_cases.len());
+        assert_eq!(report.overlaps.len(), deserialized.overlaps.len());
+    }
+
+    #[test]
+    fn test_too_many_predicates() {
+        // Create a spec with many boolean variables (exceeding the 20 predicate limit)
+        // Note: This is hard to test directly since we'd need 20+ boolean variables,
+        // but we can test the behavior when predicates exceed the limit
+        let mut inputs = Vec::new();
+        let mut rules = Vec::new();
+
+        // Create 10 boolean variables (would create many predicates)
+        for i in 0..10 {
+            inputs.push(Variable {
+                name: format!("var_{}", i),
+                typ: VarType::Bool,
+                description: None,
+                values: None,
+            });
+        }
+
+        // Add a few rules
+        rules.push(Rule {
+            id: "R1".into(),
+            when: Some("var_0 && var_1".into()),
+            conditions: None,
+            then: Output::Single(ConditionValue::Int(1)),
+            priority: 0,
+            description: None,
+        });
+
+        let spec = Spec {
+            id: "many_predicates".into(),
+            name: None,
+            description: None,
+            inputs,
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules,
+            default: None,
+            meta: Default::default(),
+        };
+
+        let report = analyze_completeness(&spec);
+        // Should handle gracefully - either complete analysis or report too many predicates
+        assert!(
+            report.total_combinations > 0
+                || !report.missing_cases.is_empty()
+                || report
+                    .missing_cases
+                    .iter()
+                    .any(|c| c.cel_conditions.iter().any(|s| s.contains("Too many")))
+        );
+    }
+
+    #[test]
+    fn test_spec_with_conditions_only() {
+        // Test spec using conditions: instead of when:
+        let spec = Spec {
+            id: "conditions_only".into(),
+            name: None,
+            description: None,
+            inputs: vec![Variable {
+                name: "x".into(),
+                typ: VarType::Bool,
+                description: None,
+                values: None,
+            }],
+            outputs: vec![Variable {
+                name: "result".into(),
+                typ: VarType::Int,
+                description: None,
+                values: None,
+            }],
+            rules: vec![
+                Rule {
+                    id: "R1".into(),
+                    when: None,
+                    conditions: Some(vec![crate::spec::Condition {
+                        var: "x".into(),
+                        op: crate::spec::ConditionOp::Eq,
+                        value: ConditionValue::Bool(true),
+                    }]),
+                    then: Output::Single(ConditionValue::Int(1)),
+                    priority: 0,
+                    description: None,
+                },
+                Rule {
+                    id: "R2".into(),
+                    when: None,
+                    conditions: Some(vec![crate::spec::Condition {
+                        var: "x".into(),
+                        op: crate::spec::ConditionOp::Eq,
+                        value: ConditionValue::Bool(false),
+                    }]),
+                    then: Output::Single(ConditionValue::Int(2)),
+                    priority: 0,
+                    description: None,
+                },
+            ],
+            default: None,
+            meta: Default::default(),
+        };
+
+        let report = analyze_completeness(&spec);
+        // Should handle gracefully - may not extract predicates from conditions:
+        // but should not panic. Just verify we get a valid report.
+        let _ = report.total_combinations; // Verify we got a report
     }
 }

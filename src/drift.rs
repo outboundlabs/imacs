@@ -5,6 +5,7 @@
 
 use crate::ast::*;
 use crate::spec::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -37,7 +38,7 @@ impl Default for DriftConfig {
 }
 
 /// Drift report
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DriftReport {
     /// Overall status
     pub status: DriftStatus,
@@ -52,7 +53,7 @@ pub struct DriftReport {
 }
 
 /// File information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FileInfo {
     pub language: String,
     pub function: String,
@@ -60,7 +61,7 @@ pub struct FileInfo {
 }
 
 /// Overall drift status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum DriftStatus {
     /// Implementations match
     Synced,
@@ -84,7 +85,7 @@ impl std::fmt::Display for DriftStatus {
 }
 
 /// A difference between implementations
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Difference {
     /// Type of difference
     pub kind: DifferenceKind,
@@ -101,7 +102,7 @@ pub struct Difference {
 }
 
 /// Types of differences
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum DifferenceKind {
     /// Different number of rules/branches
     RuleCount,
@@ -120,7 +121,7 @@ pub enum DifferenceKind {
 }
 
 /// Severity of difference
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum DiffSeverity {
     Info,
     Warning,
@@ -128,7 +129,7 @@ pub enum DiffSeverity {
 }
 
 /// Summary statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DriftSummary {
     pub total_differences: usize,
     pub errors: usize,

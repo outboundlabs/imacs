@@ -71,12 +71,113 @@ chain:
 
 Orchestrator step types: `call`, `gate`, `branch`, `parallel`, `loop`, `compute`, `try`
 
-## Quick Start
+## Getting Started
+
+IMACS can be used in two ways:
+- **CLI Tool**: Install and use from the command line
+- **Library**: Add as a dependency to your Rust project
 
 ### Installation
 
+#### As a CLI Tool
+
 ```bash
 cargo install imacs
+```
+
+Or build from source:
+
+```bash
+git clone https://github.com/anthropics/imacs.git
+cd imacs
+cargo build --release
+```
+
+#### As a Library
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+imacs = "0.0.1"
+```
+
+Then use in your Rust code:
+
+```rust
+use imacs::{Spec, render, Target};
+
+let spec = Spec::from_yaml(yaml_content)?;
+let code = render(&spec, Target::Rust);
+```
+
+### Project Structure
+
+IMACS uses a convention-based folder structure:
+
+```
+project/
+├── imacs/                          # ROOT folder (or .imacs/)
+│   ├── .imacs_root                 # Project root config + version lock
+│   ├── common/                     # Shared specs
+│   │   └── validation.yaml
+│   └── example.yaml
+├── services/
+│   ├── auth/
+│   │   ├── imacs/                  # Child folder
+│   │   │   ├── config.yaml         # Optional local overrides
+│   │   │   └── login.yaml
+│   │   └── generated/              # Auto-generated code
+│   │       ├── .imacs_meta.yaml    # Staleness tracking
+│   │       └── login.rs
+│   └── billing/
+│       ├── imacs/
+│       │   └── invoice.yaml
+│       └── generated/
+│           └── invoice.rs
+```
+
+#### Initialize a Project
+
+```bash
+# Create project root
+imacs init --root
+
+# Create local imacs folder (inherits root config)
+cd services/auth
+imacs init
+```
+
+#### Project Configuration
+
+The `.imacs_root` file in the root `imacs/` folder defines project-wide settings:
+
+```yaml
+version: 1
+imacs_version: ">=0.1.0"
+
+project:
+  name: my-project
+  spec_id_prefix: ""                # Optional prefix to avoid ID collisions
+
+defaults:
+  targets: [rust, typescript]       # Languages to generate
+  auto_format: true
+  naming:
+    code: "{spec_id}.{ext}"
+    tests: "{spec_id}_test.{ext}"
+
+validation:
+  require_unique_ids: true          # Error on ID collision
+  require_descriptions: false
+  max_rules_per_spec: 50
+```
+
+Child folders can override defaults with `config.yaml`:
+
+```yaml
+# services/auth/imacs/config.yaml
+targets: [rust]  # Override: only generate Rust for this folder
 ```
 
 ### Define a Spec
@@ -145,16 +246,111 @@ imacs test login_attempt.yaml --lang rust > tests/login_attempt_test.rs
 imacs verify login_attempt.yaml src/login_attempt.rs
 ```
 
+### Analyze Completeness
+
+```bash
+# Single spec analysis
+imacs completeness login_attempt.yaml
+
+# Suite analysis (multiple specs in a directory)
+imacs completeness specs/
+
+# JSON output for LLM integration
+imacs completeness login_attempt.yaml --json
+```
+
+### Validate Spec
+
+```bash
+# Check for impossible/invalid conditions
+imacs validate login_attempt.yaml
+
+# Strict mode (treat warnings as errors)
+imacs validate login_attempt.yaml --strict
+
+# Generate and apply fixes automatically
+imacs validate login_attempt.yaml --fix
+
+# Preview fixes without applying
+imacs validate login_attempt.yaml --fix --dry-run
+
+# Apply all fixes including low-confidence ones
+imacs validate login_attempt.yaml --fix --all
+```
+
 ## CLI Commands
+
+### Core Commands
+
+| Command | Description | Options |
+|---------|-------------|---------|
+| `verify <spec> <code>` | Check code implements spec correctly | `--json` |
+| `render <spec>` | Generate code from spec | `--lang <lang>`, `--output <file>` |
+| `test <spec>` | Generate tests from spec | `--lang <lang>`, `--output <file>` |
+| `analyze <code>` | Analyze code complexity | `--json` |
+| `extract <code>` | Extract spec from existing code | `--json` |
+| `drift <code_a> <code_b>` | Compare two implementations | `--json` |
+
+### Analysis Commands
+
+| Command | Description | Options |
+|---------|-------------|---------|
+| `completeness <spec\|dir>` | Analyze spec(s) for missing cases and overlaps | `--json`, `--full` |
+| `validate <spec>` | Validate spec for impossible situations | `--strict`, `--json`, `--fix`, `--dry-run`, `--all` |
+| `schema [name]` | Print JSON schema for output type | (none) |
+
+### Utility Commands
 
 | Command | Description |
 |---------|-------------|
-| `verify <spec> <code>` | Check code implements spec correctly |
-| `render <spec> [--lang]` | Generate code from spec |
-| `test <spec> [--lang]` | Generate tests from spec |
-| `analyze <code>` | Analyze code complexity |
-| `extract <code>` | Extract spec from existing code |
-| `drift <code_a> <code_b>` | Compare two implementations |
+| `regen` | Regenerate src/generated/ from specs/ |
+| `selfcheck` | Verify generated code matches specs |
+| `version`, `-v` | Show version |
+| `help`, `-h` | Show usage |
+
+### Command Options
+
+- `--lang <rust\|typescript\|python\|csharp\|java\|go>` - Target language (default: rust)
+- `--output <file>` - Output file (default: stdout)
+- `--json` - JSON output format (verify, analyze, extract, drift, completeness, validate)
+- `--full` - Full exhaustive analysis for completeness suite mode
+- `--strict` - Strict mode: treat warnings as errors (validate command)
+- `--fix` - Apply fixes automatically (validate command)
+- `--dry-run` - Preview changes without applying (validate command)
+- `--all` - Apply all fixes including low-confidence ones (validate command)
+
+### Examples
+
+```bash
+# Initialize project
+imacs init --root                    # Create root imacs/ folder
+imacs init                           # Create local imacs/ folder
+
+# Generate code
+imacs render login_attempt.yaml --lang rust
+imacs regen                          # Regenerate current folder
+imacs regen --all                    # Regenerate entire project
+imacs regen --force                  # Force regenerate (ignore staleness)
+
+# Check status
+imacs status                         # Show project status
+imacs status --json                  # JSON output
+
+# Generate tests
+imacs test login_attempt.yaml --lang typescript --output tests/login.test.ts
+
+# Verify implementation
+imacs verify login_attempt.yaml src/login.rs --json
+
+# Analyze completeness
+imacs completeness specs/ --full
+
+# Validate and auto-fix
+imacs validate login_attempt.yaml --fix
+
+# Get JSON schema
+imacs schema validate
+```
 
 ## Library Usage
 
@@ -298,7 +494,7 @@ if !report.is_complete {
 }
 
 for overlap in &report.overlaps {
-    println!("Rules {} and {} overlap", overlap.rule_a, overlap.rule_b);
+    println!("Rules {} and {} overlap", overlap.rule_ids);
 }
 ```
 
@@ -310,12 +506,79 @@ for overlap in &report.overlaps {
 | **Overlapping rules** | Multiple rules match the same input |
 | **Minimization opportunities** | Redundant rules that can be simplified |
 
+### Suite Analysis
+
+Analyze multiple specs together to find cross-cutting issues:
+
+```bash
+imacs completeness specs/ --full
+```
+
+Detects:
+- **Collisions**: Same variable names with different meanings/types across specs
+- **Duplicates**: Identical logic implemented in multiple specs
+- **Relationships**: Chains (output of one spec is input to another) and merge opportunities
+- **Suite gaps**: Missing cases across the entire spec suite
+
 ### How It Works
 
 1. **Predicate extraction**: Parse CEL expressions into atomic boolean predicates
 2. **Truth table analysis**: Enumerate all 2^n combinations
 3. **Gap detection**: Find uncovered input patterns
 4. **Espresso minimization**: EXPAND → REDUCE → IRREDUNDANT phases
+5. **Cross-spec analysis**: Compare predicates, variables, and rules across multiple specs
+
+## Spec Validation
+
+IMACS can detect impossible or invalid spec conditions:
+
+```bash
+imacs validate spec.yaml
+```
+
+### What It Detects
+
+| Issue Type | Description | Fix Confidence |
+|------------|-------------|----------------|
+| **Contradictory rules** | Same condition, different outputs, no priority | High |
+| **Dead rules** | Covered by earlier rules, can never fire | High |
+| **Tautology conditions** | Always match, not marked as default | Medium |
+| **Type mismatches** | Wrong types in CEL comparisons | Medium |
+| **Unsatisfiable conditions** | Can never be true | Low |
+
+### Auto-Fix
+
+IMACS can automatically fix many issues:
+
+```bash
+# Preview fixes
+imacs validate spec.yaml --fix --dry-run
+
+# Apply high-confidence fixes
+imacs validate spec.yaml --fix
+
+# Apply all fixes including low-confidence
+imacs validate spec.yaml --fix --all
+```
+
+Fixes are structured and machine-readable, perfect for LLM integration:
+
+```json
+{
+  "fixes": [
+    {
+      "issue_code": "V001",
+      "confidence": "High",
+      "operation": {
+        "type": "AddPriority",
+        "rule_id": "R1",
+        "priority": 1
+      },
+      "description": "Add priority 1 to rule R1 to resolve conflict with R2"
+    }
+  ]
+}
+```
 
 ## Architecture
 

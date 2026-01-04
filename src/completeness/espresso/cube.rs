@@ -326,6 +326,34 @@ impl Cube {
         result
     }
 
+    /// Check if this cube covers a specific minterm (input combination)
+    /// minterm is a bitmask where bit i represents the value of variable i
+    pub fn covers_minterm(&self, minterm: u64) -> bool {
+        if !self.has_active_output() {
+            return false;
+        }
+
+        for (i, input_val) in self.inputs.iter().enumerate() {
+            let bit_val = (minterm >> i) & 1 == 1;
+            match input_val {
+                CubeValue::Zero => {
+                    if bit_val {
+                        return false; // Cube requires 0, but minterm has 1
+                    }
+                }
+                CubeValue::One => {
+                    if !bit_val {
+                        return false; // Cube requires 1, but minterm has 0
+                    }
+                }
+                CubeValue::DontCare => {
+                    // Don't care - matches either value
+                }
+            }
+        }
+        true
+    }
+
     /// Check if this cube contains (covers) another cube
     pub fn contains(&self, other: &Cube) -> bool {
         if self.inputs.len() != other.inputs.len() {

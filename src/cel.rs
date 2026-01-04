@@ -19,7 +19,8 @@ use cel_parser::{parse, ArithmeticOp, Atom, Member, RelationOp, UnaryOp as CelUn
 use cel_interpreter::{Context, Program, Value};
 
 /// Target language for CEL compilation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Target {
     Rust,
     TypeScript,

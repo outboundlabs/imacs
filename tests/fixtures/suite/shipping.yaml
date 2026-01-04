@@ -1,0 +1,22 @@
+id: shipping
+name: Shipping Rules
+inputs:
+  - name: region
+    type: string
+    values: ["US", "EU", "APAC"]
+  - name: weight
+    type: int
+outputs:
+  - name: shipping_cost
+    type: float
+rules:
+  - id: R1
+    when: 'region == "US" && weight < 10'
+    then: 5.0
+  - id: R2
+    when: 'region == "US" && weight >= 10'
+    then: 10.0
+  - id: R3
+    when: 'region == "EU"'
+    then: 15.0
+

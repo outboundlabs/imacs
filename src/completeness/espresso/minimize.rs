@@ -1,3 +1,6 @@
+// Allow debug output in espresso algorithm for optimization tracing
+#![allow(clippy::print_stderr)]
+
 //! Espresso minimization algorithm
 //!
 //! This module implements the core Espresso heuristic Boolean minimization algorithm.

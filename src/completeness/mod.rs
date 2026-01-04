@@ -30,9 +30,18 @@
 
 mod adapter;
 mod analysis;
+mod collision;
+mod duplicate;
 pub mod espresso;
+mod fix;
+mod orchestrator_suite;
 mod predicates;
 mod refactor;
+mod relationship;
+mod suggestions;
+mod suite;
+mod validate;
+mod variable_match;
 
 pub use analysis::{
     analyze_completeness, IncompletenessReport, MissingCase, PredicateInfo, PredicateValue,
@@ -68,3 +77,25 @@ pub use refactor::{
     TransformationKind,
     VariableGroup,
 };
+
+// Re-export suite analysis APIs
+pub use collision::{detect_collisions, Collision, CollisionType, VariableOccurrence};
+pub use duplicate::{detect_duplicates, Duplicate, RuleRef};
+pub use fix::{apply_fixes, apply_fixes_to_yaml, FixApplicationResult};
+pub use orchestrator_suite::{
+    analyze_directory_with_orchestrators, analyze_orchestrator_suite, DirectorySuiteResult,
+    MappingIssue, MappingIssueType, OrchestratorSuiteResult,
+};
+pub use relationship::{
+    detect_relationships, OutputInputMapping, RelationshipDetails, RelationshipType,
+    SpecRelationship,
+};
+pub use suggestions::{generate_suggestions, SuggestedFix, Suggestion, SuggestionCategory};
+pub use suite::{
+    analyze_suite, AnalysisMode, ComplexityReport, SpecResult, SuiteAnalysisResult, SuiteGap,
+};
+pub use validate::{
+    validate_spec, FixConfidence, FixOperation, IssueType, Severity, SpecFix, ValidationIssue,
+    ValidationReport,
+};
+pub use variable_match::{match_variables, MatchType, VariableMatch, VariableMatchResult};

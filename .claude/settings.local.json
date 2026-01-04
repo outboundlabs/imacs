@@ -41,7 +41,23 @@
       "Bash(git config:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd IMACS: Intelligent Model-Assisted Code Synthesis\n\nCore library for spec-driven code verification, generation, and testing:\n\n## Features\n- Parse YAML specs with CEL \\(Common Expression Language\\) conditions\n- Generate code in 6 languages: Rust, TypeScript, Python, Go, Java, C#\n- Verify existing code against specs\n- Analyze code complexity and detect issues\n- Extract specs from existing code\n- Detect drift between implementations\n\n## Modules\n- cel: CEL parsing, compilation, and evaluation \\(cel-interpreter 0.10\\)\n- spec: YAML spec parsing with JSON Schema \\(schemars 0.8\\)\n- render: Multi-language code generation\n- verify: Code verification against specs\n- analyze: Code complexity analysis\n- extract: Spec extraction from code\n- drift: Implementation drift detection\n- format: Rust code formatting \\(prettyplease 0.2\\)\n- completeness: Decision table completeness analysis with Espresso\n\n## Completeness Analysis \\(Phase 5\\)\n- Predicate extraction from CEL expressions\n- Truth table analysis for gap detection\n- Overlap detection for conflicting rules\n- Espresso Boolean minimization \\(EXPAND, REDUCE, IRREDUNDANT\\)\n- CEL ↔ Cube conversion bridge\n\n## Tests\n- 109 tests passing across all modules\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(./target/release/imacs:*)"
+      "Bash(./target/release/imacs:*)",
+      "Bash(tree:*)",
+      "Bash(cargo --version:*)",
+      "Bash(rustc:*)",
+      "Bash(CARGO_HOME=/tmp/cargo cargo fmt:*)",
+      "Bash(CARGO_HOME=/tmp/cargo cargo clippy:*)",
+      "Bash(CARGO_HOME=/tmp/cargo cargo publish:*)",
+      "Bash(CARGO_HOME=/tmp/cargo cargo package:*)",
+      "Bash(tar:*)",
+      "Bash(echo:*)",
+      "Bash(CARGO_HOME=/tmp/cargo cargo install:*)",
+      "Bash(CARGO_HOME=/tmp/cargo cargo dist init:*)",
+      "Bash(/tmp/cargo/bin/dist init:*)",
+      "Bash(CARGO_HOME=/tmp/cargo /tmp/cargo/bin/dist init:*)",
+      "Bash(CARGO_HOME=/tmp/cargo /tmp/cargo/bin/dist generate:*)",
+      "Bash(CARGO_HOME=/tmp/cargo /tmp/cargo/bin/dist build:*)",
+      "Bash(CARGO_HOME=/tmp/cargo timeout 180 cargo test:*)"
     ]
   }
 }
