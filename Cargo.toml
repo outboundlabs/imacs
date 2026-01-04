@@ -39,7 +39,7 @@ chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
 
 # Code generation
-genco = "0.17"
+genco = "0.19"
 
 # Code formatting
 prettyplease = "0.2"
