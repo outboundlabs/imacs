@@ -63,7 +63,7 @@ update-informer = "1.1"
 [dev-dependencies]
 proptest = "1.0"
 pretty_assertions = "1.4"
-rstest = "0.18"
+rstest = "0.26"
 cargo-llvm-cov = "0.6"
 tempfile = "3.10"
 
