@@ -1,0 +1,102 @@
+{# Go orchestrator template #}
+{% if provenance %}
+// GENERATED FROM: {{ id }}.yaml
+// GENERATED: {{ generated_at }}
+// DO NOT EDIT - regenerate from spec
+
+{% endif %}
+{% if module_path %}
+// Module: {{ module_path }}
+{% endif %}
+package {{ package | default("generated") }}
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type {{ id_pascal }}Input struct {
+{% for input in inputs %}
+	{{ input.name_pascal }} {{ input.go_type }} `json:"{{ input.name }}"`
+{% endfor %}
+}
+
+type {{ id_pascal }}Output struct {
+{% for output in outputs %}
+	{{ output.name_pascal }} {{ output.go_type }} `json:"{{ output.name }}"`
+{% endfor %}
+}
+
+type {{ id_pascal }}Context struct {
+{% for step in steps %}
+{% if step.is_call %}
+	{{ step.id | pascal_case }} interface{}
+{% endif %}
+{% endfor %}
+}
+
+type {{ id_pascal }}Error struct {
+	Step    string
+	Type    string
+	Message string
+}
+
+func (e {{ id_pascal }}Error) Error() string {
+	return fmt.Sprintf("%s error in step %s: %s", e.Type, e.Step, e.Message)
+}
+
+func {{ id_pascal }}(input {{ id_pascal }}Input) ({{ id_pascal }}Output, error) {
+	ctx := {{ id_pascal }}Context{}
+{% for step in steps %}
+{% if step.is_call %}
+{% if step.condition_go %}
+
+	// Step: {{ step.id }} (call {{ step.spec_id }}) - conditional
+	if {{ step.condition_go }} {
+{% endif %}
+	// Step: {{ step.id }} (call {{ step.spec_id }})
+	{{ step.id }}Input := {{ step.spec_id | pascal_case }}Input{
+{% for mapping in step.input_mappings %}
+		{{ mapping.spec_input_name | pascal_case }}: {{ mapping.expr_go }}{% if not loop.last %},{% endif %}
+{% endfor %}
+	}
+	{{ step.id }}Result := {{ step.spec_id | pascal_case }}({{ step.id }}Input)
+	ctx.{{ step.id | pascal_case }} = {{ step.id }}Result
+{% if step.condition_go %}
+	}
+{% endif %}
+{% elif step.is_gate %}
+
+	// Gate: {{ step.id }}
+	if !({{ step.condition_go }}) {
+		return {{ id_pascal }}Output{}, {{ id_pascal }}Error{
+			Step:    "{{ step.id }}",
+			Type:    "gate_failed",
+			Message: "Gate condition failed: {{ step.condition }}",
+		}
+	}
+{% elif step.is_compute %}
+
+	// Compute: {{ step.id }}
+	// TODO: Implement compute step
+{% elif step.is_branch %}
+
+	// Branch: {{ step.id }}
+	if {{ step.condition_go }} {
+		// TODO: true branch
+	} else {
+		// TODO: false branch
+	}
+{% elif step.is_loop %}
+
+	// Loop: {{ step.id }}
+	// TODO: Implement loop
+{% endif %}
+{% endfor %}
+
+	return {{ id_pascal }}Output{
+{% for output in outputs %}
+		{{ output.name_pascal }}: /* TODO: map output from context */,
+{% endfor %}
+	}, nil
+}

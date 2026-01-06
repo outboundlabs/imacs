@@ -1,0 +1,12 @@
+version: 1
+project:
+  name: "imacs-examples"
+defaults:
+  targets:
+    - rust
+    - typescript
+    - python
+    - csharp
+    - go
+    - java
+  output_dir: "../generated"

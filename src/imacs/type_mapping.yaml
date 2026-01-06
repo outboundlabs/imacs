@@ -1,0 +1,207 @@
+# Type Mapping Spec
+# Maps IMACS VarType to target language type strings
+#
+# DOGFOODING: This spec defines how the library renders types.
+# The generated code is used by render.rs
+
+id: type_mapping
+name: "Variable Type to Target Language Mapping"
+
+inputs:
+  - name: var_type
+    type: !enum [Bool, Int, Float, String, Object]
+  - name: target
+    type: !enum [Rust, TypeScript, Python, CSharp, Java, Go]
+
+outputs:
+  - name: type_string
+    type: string
+
+rules:
+  # Boolean
+  - id: bool_rust
+    when:
+      - var_type == 'Bool'
+      - target == 'Rust'
+    then: "bool"
+
+  - id: bool_ts
+    when:
+      - var_type == 'Bool'
+      - target == 'TypeScript'
+    then: "boolean"
+
+  - id: bool_py
+    when:
+      - var_type == 'Bool'
+      - target == 'Python'
+    then: "bool"
+
+  # Integer
+  - id: int_rust
+    when:
+      - var_type == 'Int'
+      - target == 'Rust'
+    then: "i64"
+
+  - id: int_ts
+    when:
+      - var_type == 'Int'
+      - target == 'TypeScript'
+    then: "number"
+
+  - id: int_py
+    when:
+      - var_type == 'Int'
+      - target == 'Python'
+    then: "int"
+
+  # Float
+  - id: float_rust
+    when:
+      - var_type == 'Float'
+      - target == 'Rust'
+    then: "f64"
+
+  - id: float_ts
+    when:
+      - var_type == 'Float'
+      - target == 'TypeScript'
+    then: "number"
+
+  - id: float_py
+    when:
+      - var_type == 'Float'
+      - target == 'Python'
+    then: "float"
+
+  # String
+  - id: string_rust
+    when:
+      - var_type == 'String'
+      - target == 'Rust'
+    then: "String"
+
+  - id: string_ts
+    when:
+      - var_type == 'String'
+      - target == 'TypeScript'
+    then: "string"
+
+  - id: string_py
+    when:
+      - var_type == 'String'
+      - target == 'Python'
+    then: "str"
+
+  # Object
+  - id: object_rust
+    when:
+      - var_type == 'Object'
+      - target == 'Rust'
+    then: "serde_json::Value"
+
+  - id: object_ts
+    when:
+      - var_type == 'Object'
+      - target == 'TypeScript'
+    then: "Record<string, unknown>"
+
+  - id: object_py
+    when:
+      - var_type == 'Object'
+      - target == 'Python'
+    then: "dict"
+
+  # C# types
+  - id: bool_csharp
+    when:
+      - var_type == 'Bool'
+      - target == 'CSharp'
+    then: "bool"
+
+  - id: int_csharp
+    when:
+      - var_type == 'Int'
+      - target == 'CSharp'
+    then: "long"
+
+  - id: float_csharp
+    when:
+      - var_type == 'Float'
+      - target == 'CSharp'
+    then: "double"
+
+  - id: string_csharp
+    when:
+      - var_type == 'String'
+      - target == 'CSharp'
+    then: "string"
+
+  - id: object_csharp
+    when:
+      - var_type == 'Object'
+      - target == 'CSharp'
+    then: "Dictionary<string, object>"
+
+  # Java types
+  - id: bool_java
+    when:
+      - var_type == 'Bool'
+      - target == 'Java'
+    then: "boolean"
+
+  - id: int_java
+    when:
+      - var_type == 'Int'
+      - target == 'Java'
+    then: "long"
+
+  - id: float_java
+    when:
+      - var_type == 'Float'
+      - target == 'Java'
+    then: "double"
+
+  - id: string_java
+    when:
+      - var_type == 'String'
+      - target == 'Java'
+    then: "String"
+
+  - id: object_java
+    when:
+      - var_type == 'Object'
+      - target == 'Java'
+    then: "Map<String, Object>"
+
+  # Go types
+  - id: bool_go
+    when:
+      - var_type == 'Bool'
+      - target == 'Go'
+    then: "bool"
+
+  - id: int_go
+    when:
+      - var_type == 'Int'
+      - target == 'Go'
+    then: "int64"
+
+  - id: float_go
+    when:
+      - var_type == 'Float'
+      - target == 'Go'
+    then: "float64"
+
+  - id: string_go
+    when:
+      - var_type == 'String'
+      - target == 'Go'
+    then: "string"
+
+  - id: object_go
+    when:
+      - var_type == 'Object'
+      - target == 'Go'
+    then: "map[string]interface{}"

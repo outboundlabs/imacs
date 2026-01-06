@@ -1,0 +1,32 @@
+id: minimizable_spec
+name: Minimizable Spec
+description: "This spec has redundant rules that can be minimized"
+inputs:
+  - name: a
+    type: bool
+  - name: b
+    type: bool
+outputs:
+  - name: result
+    type: int
+rules:
+  - id: R1
+    when:
+      - a
+      - b
+    then: 1
+    description: "Both true"
+  - id: R2
+    when:
+      - a
+      - "!b"
+    then: 1
+    description: "A true, B false (same output as R1)"
+  - id: R3
+    when:
+      - "!a"
+      - b
+    then: 1
+    description: "A false, B true (same output as R1)"
+  # These three rules can be minimized to: a || b
+

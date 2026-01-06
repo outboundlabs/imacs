@@ -1,0 +1,98 @@
+{# Rust orchestrator template #}
+{%- if module %}
+//! Module: {{ module }}
+
+{% endif -%}
+{%- if provenance %}
+// GENERATED FROM: {{ id }}.yaml
+// GENERATED: {{ generated_at }}
+// DO NOT EDIT - regenerate from spec
+
+{% endif -%}
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct {{ id_pascal }}Input {
+{%- for input in inputs %}
+    pub {{ input.name }}: {{ input.rust_type }},
+{%- endfor %}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct {{ id_pascal }}Output {
+{%- for output in outputs %}
+    pub {{ output.name }}: {{ output.rust_type }},
+{%- endfor %}
+}
+
+#[derive(Debug, Clone, Default)]
+struct {{ id_pascal }}Context {
+{%- for step in steps %}
+{%- if step.is_call %}
+    {{ step.id }}: Option<Value>,
+{%- endif %}
+{%- endfor %}
+}
+
+#[derive(Debug, Clone)]
+pub enum {{ id_pascal }}Error {
+    StepFailed { step: String, message: String },
+    GateFailed { gate: String, condition: String },
+    Timeout { step: String },
+}
+
+pub fn {{ id }}(input: {{ id_pascal }}Input) -> Result<{{ id_pascal }}Output, {{ id_pascal }}Error> {
+    let mut ctx = {{ id_pascal }}Context::default();
+{%- for step in steps %}
+{%- if step.is_call %}
+{%- if step.condition_rust %}
+
+    // Step: {{ step.id }} (call {{ step.spec_id }}) - conditional
+    if {{ step.condition_rust }} {
+{%- endif %}
+    // Step: {{ step.id }} (call {{ step.spec_id }})
+    let {{ step.id }}_input = {{ step.spec_id | pascal_case }}Input {
+{%- for mapping in step.input_mappings %}
+        {{ mapping.spec_input_name }}: {{ mapping.expr_rust }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+    };
+    let {{ step.id }}_result = {{ step.spec_id }}({{ step.id }}_input);
+    ctx.{{ step.id }} = Some(serde_json::to_value(&{{ step.id }}_result).unwrap());
+{%- if step.condition_rust %}
+    }
+{%- endif %}
+{%- elif step.is_gate %}
+
+    // Gate: {{ step.id }}
+    if !({{ step.condition_rust }}) {
+        return Err({{ id_pascal }}Error::GateFailed {
+            gate: "{{ step.id }}".into(),
+            condition: "{{ step.condition }}".into(),
+        });
+    }
+{%- elif step.is_compute %}
+
+    // Compute: {{ step.id }}
+    // TODO: Implement compute step
+{%- elif step.is_branch %}
+
+    // Branch: {{ step.id }}
+    if {{ step.condition_rust }} {
+        // TODO: true branch
+    } else {
+        // TODO: false branch
+    }
+{%- elif step.is_loop %}
+
+    // Loop: {{ step.id }}
+    // TODO: Implement loop
+{%- endif %}
+{%- endfor %}
+
+    Ok({{ id_pascal }}Output {
+{%- for output in outputs %}
+        {{ output.name }}: todo!("map output {{ output.name }} from context"),
+{%- endfor %}
+    })
+}

@@ -1,0 +1,142 @@
+# Operator Mapping Spec
+# Maps comparison/logical operators to target language syntax
+#
+# DOGFOODING: This spec defines how CEL operators render to each language.
+
+id: operator_mapping
+name: "Operator to Target Language Syntax"
+
+inputs:
+  - name: op
+    type: !enum [Eq, Ne, Lt, Le, Gt, Ge, And, Or, Not, In]
+  - name: target
+    type: !enum [Rust, TypeScript, Python, CSharp, Java, Go]
+
+outputs:
+  - name: syntax
+    type: string
+
+rules:
+  # Equality - TypeScript uses strict
+  - id: eq_ts
+    when:
+      - op == 'Eq'
+      - target == 'TypeScript'
+    then: "==="
+
+  - id: eq_default
+    when:
+      - op == 'Eq'
+    then: "=="
+
+  # Not Equal - TypeScript uses strict
+  - id: ne_ts
+    when:
+      - op == 'Ne'
+      - target == 'TypeScript'
+    then: "!=="
+
+  - id: ne_default
+    when:
+      - op == 'Ne'
+    then: "!="
+
+  # Less Than (same everywhere)
+  - id: lt
+    when:
+      - op == 'Lt'
+    then: "<"
+
+  # Less Than or Equal (same everywhere)
+  - id: le
+    when:
+      - op == 'Le'
+    then: "<="
+
+  # Greater Than (same everywhere)
+  - id: gt
+    when:
+      - op == 'Gt'
+    then: ">"
+
+  # Greater Than or Equal (same everywhere)
+  - id: ge
+    when:
+      - op == 'Ge'
+    then: ">="
+
+  # Logical And - Python uses 'and'
+  - id: and_py
+    when:
+      - op == 'And'
+      - target == 'Python'
+    then: "and"
+
+  - id: and_default
+    when:
+      - op == 'And'
+    then: "&&"
+
+  # Logical Or - Python uses 'or'
+  - id: or_py
+    when:
+      - op == 'Or'
+      - target == 'Python'
+    then: "or"
+
+  - id: or_default
+    when:
+      - op == 'Or'
+    then: "||"
+
+  # Logical Not - Python uses 'not'
+  - id: not_py
+    when:
+      - op == 'Not'
+      - target == 'Python'
+    then: "not "
+
+  - id: not_default
+    when:
+      - op == 'Not'
+    then: "!"
+
+  # In operator - handled specially per language
+  - id: in_rust
+    when:
+      - op == 'In'
+      - target == 'Rust'
+    then: ".contains(&{})"
+
+  - id: in_ts
+    when:
+      - op == 'In'
+      - target == 'TypeScript'
+    then: ".includes({})"
+
+  - id: in_py
+    when:
+      - op == 'In'
+      - target == 'Python'
+    then: " in "
+
+  # C# In operator
+  - id: in_csharp
+    when:
+      - op == 'In'
+      - target == 'CSharp'
+    then: ".Contains({})"
+
+  # Java In operator
+  - id: in_java
+    when:
+      - op == 'In'
+      - target == 'Java'
+    then: ".contains({})"
+
+  # Go In operator (requires helper function)
+  - id: in_go
+    when:
+      - op == 'In'
+      - target == 'Go'
+    then: "contains({}, {})"

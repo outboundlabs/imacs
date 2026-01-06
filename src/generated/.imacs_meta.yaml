@@ -1,0 +1,56 @@
+# AUTO-GENERATED - DO NOT EDIT
+# This file tracks spec file hashes for staleness detection
+# Regenerated automatically by 'imacs regen'
+
+spec_hashes:
+  string_render.yaml: d35ab4fcdba021e31fe60af7f6b98a2f071fa74634ad08b9b4990e9ef21e1b1f
+  extraction_confidence.yaml: 9b7980142164234089e3bdb53a786a1ade5f2705d4b8490b744f52aad59fb282
+  test_mode.yaml: 8da2e3c210cd9d016be15c309b1ca4c91f7a09994db10754805723d2afcc90e8
+  bool_literal.yaml: 24c485abfcbb1ca37881296cb1513e7bd640884c62405fa0b1d2404724957e9a
+  cel_functions.yaml: bbfaf0e0656849a764f4900e994de1e200b1ee288ac5d60f2ebf745ad5d977e5
+  drift_status.yaml: f4bad6cb3db802755a440cc693f037809b52e57b834b6d33754acdd3ffce3527
+  operator_negation.yaml: b2a60bd35306e8186f97db1202f95b6fb2d2aa3953adc1c05975d5450dc91e85
+  type_mapping.yaml: baf016a72f3a43fcd60bd6d9bfa316f8a0e107ae4ca4ccbb49976b6f3adccecc
+  gap_classification.yaml: 4b5b955e896d4b81d94abefeac1e0baaa9bf72e682c87940c2cd65a947538784
+  issue_severity.yaml: 4c49f991588dcfe28a1cf2794086535a37b6a64423b57a7d073cb33be5ad0087
+  operator_mapping.yaml: 6d49be33a1589949ecc3d25cbdc709ebd5c436a879bdab8070d1d53867a3a57d
+  null_literal.yaml: f6a87a39987a18af0557ae027ad1761058504915ed2b742b061b569a2bcd24d4
+generated_files:
+  extraction_confidence:
+  - extraction_confidence.rs
+  - extraction_confidence_test.rs
+  string_render:
+  - string_render.rs
+  - string_render_test.rs
+  bool_literal:
+  - bool_literal.rs
+  - bool_literal_test.rs
+  null_literal:
+  - null_literal.rs
+  - null_literal_test.rs
+  operator_mapping:
+  - operator_mapping.rs
+  - operator_mapping_test.rs
+  type_mapping:
+  - type_mapping.rs
+  - type_mapping_test.rs
+  operator_negation:
+  - operator_negation.rs
+  - operator_negation_test.rs
+  drift_status:
+  - drift_status.rs
+  - drift_status_test.rs
+  test_mode_selection:
+  - test_mode_selection.rs
+  - test_mode_selection_test.rs
+  issue_severity:
+  - issue_severity.rs
+  - issue_severity_test.rs
+  cel_functions:
+  - cel_functions.rs
+  - cel_functions_test.rs
+  gap_classification:
+  - gap_classification.rs
+  - gap_classification_test.rs
+generated_at: 1767663552
+tool_version: 0.0.1

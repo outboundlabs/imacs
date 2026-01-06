@@ -1,0 +1,281 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnalysisReport",
+  "description": "Analysis report",
+  "type": "object",
+  "required": [
+    "functions",
+    "issues",
+    "overall",
+    "recommendations"
+  ],
+  "properties": {
+    "functions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/FunctionAnalysis"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Issue"
+      }
+    },
+    "overall": {
+      "$ref": "#/definitions/OverallMetrics"
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Recommendation"
+      }
+    }
+  },
+  "definitions": {
+    "FunctionAnalysis": {
+      "description": "Analysis of a single function",
+      "type": "object",
+      "required": [
+        "issues",
+        "metrics",
+        "name"
+      ],
+      "properties": {
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Issue"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/FunctionMetrics"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "FunctionMetrics": {
+      "description": "Metrics for a function",
+      "type": "object",
+      "required": [
+        "cyclomatic_complexity",
+        "decision_points",
+        "lines",
+        "max_nesting",
+        "parameters",
+        "return_points"
+      ],
+      "properties": {
+        "cyclomatic_complexity": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "decision_points": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "lines": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "max_nesting": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "parameters": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "return_points": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Issue": {
+      "description": "An issue found in code",
+      "type": "object",
+      "required": [
+        "kind",
+        "line",
+        "message",
+        "severity"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/IssueKind"
+        },
+        "line": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        },
+        "suggestion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "IssueKind": {
+      "type": "string",
+      "enum": [
+        "HighComplexity",
+        "DeepNesting",
+        "LongFunction",
+        "MagicNumber",
+        "TooManyParams",
+        "MissingDefault"
+      ]
+    },
+    "OverallMetrics": {
+      "description": "Overall file metrics",
+      "type": "object",
+      "required": [
+        "avg_complexity",
+        "max_complexity",
+        "total_functions",
+        "total_issues",
+        "total_lines"
+      ],
+      "properties": {
+        "avg_complexity": {
+          "type": "number",
+          "format": "float"
+        },
+        "max_complexity": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "total_functions": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "total_issues": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "total_lines": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Recommendation": {
+      "description": "Recommendation for improvement",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "ExtractSpec"
+          ],
+          "properties": {
+            "ExtractSpec": {
+              "type": "object",
+              "required": [
+                "estimated_rules",
+                "function",
+                "reason"
+              ],
+              "properties": {
+                "estimated_rules": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
+                },
+                "function": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "SplitFunction"
+          ],
+          "properties": {
+            "SplitFunction": {
+              "type": "object",
+              "required": [
+                "function",
+                "reason"
+              ],
+              "properties": {
+                "function": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "ExtractConstant"
+          ],
+          "properties": {
+            "ExtractConstant": {
+              "type": "object",
+              "required": [
+                "line",
+                "suggested_name",
+                "value"
+              ],
+              "properties": {
+                "line": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
+                },
+                "suggested_name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "Info",
+        "Warning",
+        "Error"
+      ]
+    }
+  }
+}

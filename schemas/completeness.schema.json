@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IncompletenessReport",
+  "description": "Result of completeness analysis - raw data for LLM tool",
+  "type": "object",
+  "required": [
+    "can_minimize",
+    "coverage_ratio",
+    "covered_combinations",
+    "is_complete",
+    "missing_cases",
+    "original_rule_count",
+    "overlaps",
+    "predicates",
+    "total_combinations"
+  ],
+  "properties": {
+    "can_minimize": {
+      "description": "Minimization opportunity",
+      "type": "boolean"
+    },
+    "coverage_ratio": {
+      "type": "number",
+      "format": "double"
+    },
+    "covered_combinations": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "is_complete": {
+      "description": "Is the spec complete? (all input combinations covered)",
+      "type": "boolean"
+    },
+    "minimized_rule_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint",
+      "minimum": 0.0
+    },
+    "missing_cases": {
+      "description": "Missing cases - LLM tool uses these to formulate questions",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/MissingCase"
+      }
+    },
+    "original_rule_count": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0.0
+    },
+    "overlaps": {
+      "description": "Overlapping rules (multiple rules match same input)",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RuleOverlap"
+      }
+    },
+    "predicates": {
+      "description": "All predicates found in the spec",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PredicateInfo"
+      }
+    },
+    "total_combinations": {
+      "description": "Coverage statistics",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "definitions": {
+    "MissingCase": {
+      "description": "A specific uncovered input combination",
+      "type": "object",
+      "required": [
+        "cel_conditions",
+        "input_values",
+        "predicate_values"
+      ],
+      "properties": {
+        "cel_conditions": {
+          "description": "CEL conditions that describe this case",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "input_values": {
+          "description": "Input variable values (if determinable)",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "predicate_values": {
+          "description": "The predicate values for this case",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PredicateValue"
+          }
+        }
+      }
+    },
+    "PredicateInfo": {
+      "description": "Information about a predicate for the report",
+      "type": "object",
+      "required": [
+        "cel_expression",
+        "id"
+      ],
+      "properties": {
+        "cel_expression": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "PredicateValue": {
+      "description": "A predicate with its truth value in a missing case",
+      "type": "object",
+      "required": [
+        "cel_expression",
+        "predicate_id",
+        "value"
+      ],
+      "properties": {
+        "cel_expression": {
+          "type": "string"
+        },
+        "predicate_id": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    "RuleOverlap": {
+      "description": "Overlapping rules - multiple rules match the same input",
+      "type": "object",
+      "required": [
+        "cel_conditions",
+        "predicate_values",
+        "rule_ids"
+      ],
+      "properties": {
+        "cel_conditions": {
+          "description": "CEL conditions for the overlap",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "predicate_values": {
+          "description": "The predicate values where they overlap",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PredicateValue"
+          }
+        },
+        "rule_ids": {
+          "description": "The rules that overlap",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

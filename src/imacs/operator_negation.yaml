@@ -1,0 +1,46 @@
+# Operator Negation Spec
+# Defines how to negate comparison operators
+#
+# DOGFOODING: Used when handling !(...) in conditions
+
+id: operator_negation
+name: "Operator Negation Rules"
+
+inputs:
+  - name: op
+    type: !enum [Eq, Ne, Lt, Le, Gt, Ge]
+
+outputs:
+  - name: negated
+    type: !enum [Eq, Ne, Lt, Le, Gt, Ge]
+
+rules:
+  - id: eq_to_ne
+    when:
+      - op == 'Eq'
+    then: "Ne"
+
+  - id: ne_to_eq
+    when:
+      - op == 'Ne'
+    then: "Eq"
+
+  - id: lt_to_ge
+    when:
+      - op == 'Lt'
+    then: "Ge"
+
+  - id: le_to_gt
+    when:
+      - op == 'Le'
+    then: "Gt"
+
+  - id: gt_to_le
+    when:
+      - op == 'Gt'
+    then: "Le"
+
+  - id: ge_to_lt
+    when:
+      - op == 'Ge'
+    then: "Lt"

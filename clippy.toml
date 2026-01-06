@@ -1,0 +1,11 @@
+# Clippy configuration for production-quality Rust code
+# Prevents panics and enforces correct Result<> handling
+
+# Maximum allowed cognitive complexity
+cognitive-complexity-threshold = 30
+
+# Lint groups to enable at warn level
+# These are enabled in lib.rs via #![warn(...)]
+
+# Allow certain patterns that are acceptable in this codebase
+allow-unwrap-in-tests = true

@@ -1,0 +1,82 @@
+id: shipping_rate
+name: "Shipping Rate Calculator"
+
+inputs:
+  - name: weight_kg
+    type: float
+  - name: zone
+    type: string
+    values: !enum [domestic, north_america, international]
+  - name: priority
+    type: bool
+  - name: member_tier
+    type: string
+    values: !enum [none, silver, gold]
+
+outputs:
+  - name: rate
+    type: float
+
+rules:
+  # Gold members: free domestic
+  - id: R1
+    when:
+      - member_tier == 'gold'
+      - zone == 'domestic'
+    then: 0.0
+
+  # Priority international: weight-based premium
+  - id: R2
+    when:
+      - priority
+      - zone == 'international'
+    then: "weight_kg * 25.0 + 50.0"
+
+  # Priority north america
+  - id: R3
+    when:
+      - priority
+      - zone == 'north_america'
+    then: "weight_kg * 15.0 + 20.0"
+
+  # Priority domestic
+  - id: R4
+    when:
+      - priority
+      - zone == 'domestic'
+    then: "weight_kg * 8.0 + 10.0"
+
+  # Silver member discount (20% off base)
+  - id: R5
+    when:
+      - member_tier == 'silver'
+      - zone == 'international'
+    then: "weight_kg * 16.0 + 30.0"
+
+  - id: R6
+    when:
+      - member_tier == 'silver'
+      - zone == 'north_america'
+    then: "weight_kg * 8.0 + 12.0"
+
+  - id: R7
+    when:
+      - member_tier == 'silver'
+      - zone == 'domestic'
+    then: "weight_kg * 4.0 + 5.0"
+
+  # Standard rates
+  - id: R8
+    when:
+      - zone == 'international'
+    then: "weight_kg * 20.0 + 40.0"
+
+  - id: R9
+    when:
+      - zone == 'north_america'
+    then: "weight_kg * 10.0 + 15.0"
+
+  - id: R10
+    when:
+      - zone == 'domestic'
+    then: "weight_kg * 5.0 + 7.0"

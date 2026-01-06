@@ -1,0 +1,58 @@
+{%- if module -%}
+//! Module: {{ module }}
+
+{% endif -%}
+{%- if provenance -%}
+// GENERATED FROM: {{ id }}.yaml
+// SPEC HASH: {{ spec_hash }}
+// GENERATED: {{ generated_at }}
+// DO NOT EDIT - regenerate from spec
+
+{% endif %}
+{%- if needs_hashmap %}
+use std::collections::HashMap;
+
+{% endif %}
+#[allow(unused_parens, unused_variables, clippy::bool_comparison, clippy::if_same_then_else)]
+pub fn {{ id }}({% for input in inputs %}{{ input.name }}: {{ input.rust_type }}{% if not loop.last %}, {% endif %}{% endfor %}) -> {% if has_named_outputs %}HashMap<String, String>{% elif outputs | length > 1 %}({% for output in outputs %}{{ output.rust_type }}{% if not loop.last %}, {% endif %}{% endfor %}){% else %}{{ outputs[0].rust_type }}{% endif %} {
+{%- if use_match %}
+    match ({% for input in inputs %}{{ input.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+{%- for rule in rules %}
+        // {{ rule.id }}
+        {{ rule.pattern_rust }} => {% if rule.output.named and has_named_outputs %}HashMap::from([{% for item in rule.output.named|items %}{% if not loop.first %}, {% endif %}("{{ item[0] }}", {{ item[1].rust }}){% endfor %}]){% elif rule.output.named %}({% for output in outputs %}{{ rule.output.named[output.name].rust }}{% if not loop.last %}, {% endif %}{% endfor %}){% else %}{{ rule.output.rust }}{% endif %},
+{%- endfor %}
+{%- if default %}
+        _ => {{ default.rust }},
+{%- endif %}
+    }
+{%- else %}
+{%- for rule in rules %}
+{%- if loop.first %}
+    if {{ rule.condition_rust }} {
+{%- else %}
+    } else if {{ rule.condition_rust }} {
+{%- endif %}
+        // {{ rule.id }}
+{%- if rule.output.named and has_named_outputs %}
+        HashMap::from([{% for item in rule.output.named|items %}{% if not loop.first %}, {% endif %}("{{ item[0] }}", {{ item[1].rust }}){% endfor %}])
+{%- elif rule.output.named %}
+        ({% for output in outputs %}{{ rule.output.named[output.name].rust }}{% if not loop.last %}, {% endif %}{% endfor %})
+{%- else %}
+        {{ rule.output.rust }}
+{%- endif %}
+{%- endfor %}
+    } else {
+{%- if default %}
+{%- if default.named and has_named_outputs %}
+        HashMap::from([{% for item in default.named|items %}{% if not loop.first %}, {% endif %}("{{ item[0] }}", {{ item[1].rust }}){% endfor %}])
+{%- elif default.named %}
+        ({% for output in outputs %}{{ default.named[output.name].rust }}{% if not loop.last %}, {% endif %}{% endfor %})
+{%- else %}
+        {{ default.rust }}
+{%- endif %}
+{%- else %}
+        unreachable!("No rule matched")
+{%- endif %}
+    }
+{%- endif %}
+}

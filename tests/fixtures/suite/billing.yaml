@@ -1,0 +1,22 @@
+id: billing
+name: Billing Rules
+inputs:
+  - name: customer_type
+    type: string
+    values: ["prepaid", "postpaid"]
+  - name: discount_rate
+    type: float
+outputs:
+  - name: final_amount
+    type: float
+rules:
+  - id: R1
+    when:
+      - customer_type == "prepaid"
+      - discount_rate > 0.1
+    then: 0.95
+  - id: R2
+    when:
+      - customer_type == "postpaid"
+    then: 1.0
+

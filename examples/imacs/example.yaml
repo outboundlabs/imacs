@@ -1,0 +1,20 @@
+id: example
+name: "Example Spec"
+
+inputs:
+  - name: input
+    type: bool
+
+outputs:
+  - name: result
+    type: int
+
+rules:
+  - id: R1
+    when: "input"
+    then: 1
+    description: "Input is true"
+  - id: R2
+    when: "!input"
+    then: 0
+    description: "Input is false"

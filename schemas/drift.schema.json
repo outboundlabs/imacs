@@ -1,0 +1,268 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DriftReport",
+  "description": "Drift report",
+  "type": "object",
+  "required": [
+    "differences",
+    "file_a",
+    "file_b",
+    "status",
+    "summary"
+  ],
+  "properties": {
+    "differences": {
+      "description": "Differences found",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Difference"
+      }
+    },
+    "file_a": {
+      "description": "File A info",
+      "allOf": [
+        {
+          "$ref": "#/definitions/FileInfo"
+        }
+      ]
+    },
+    "file_b": {
+      "description": "File B info",
+      "allOf": [
+        {
+          "$ref": "#/definitions/FileInfo"
+        }
+      ]
+    },
+    "status": {
+      "description": "Overall status",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DriftStatus"
+        }
+      ]
+    },
+    "summary": {
+      "description": "Summary statistics",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DriftSummary"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "DiffSeverity": {
+      "description": "Severity of difference",
+      "type": "string",
+      "enum": [
+        "Info",
+        "Warning",
+        "Error"
+      ]
+    },
+    "Difference": {
+      "description": "A difference between implementations",
+      "type": "object",
+      "required": [
+        "description",
+        "kind",
+        "severity"
+      ],
+      "properties": {
+        "description": {
+          "description": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Type of difference",
+          "allOf": [
+            {
+              "$ref": "#/definitions/DifferenceKind"
+            }
+          ]
+        },
+        "location": {
+          "description": "Location hint",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "description": "Severity",
+          "allOf": [
+            {
+              "$ref": "#/definitions/DiffSeverity"
+            }
+          ]
+        },
+        "value_a": {
+          "description": "Value in file A",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value_b": {
+          "description": "Value in file B",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "DifferenceKind": {
+      "description": "Types of differences",
+      "oneOf": [
+        {
+          "description": "Different number of rules/branches",
+          "type": "string",
+          "enum": [
+            "RuleCount"
+          ]
+        },
+        {
+          "description": "Condition differs",
+          "type": "string",
+          "enum": [
+            "Condition"
+          ]
+        },
+        {
+          "description": "Output value differs",
+          "type": "string",
+          "enum": [
+            "Output"
+          ]
+        },
+        {
+          "description": "Rule ordering differs",
+          "type": "string",
+          "enum": [
+            "Order"
+          ]
+        },
+        {
+          "description": "Missing case in one implementation",
+          "type": "string",
+          "enum": [
+            "MissingCase"
+          ]
+        },
+        {
+          "description": "Extra case in one implementation",
+          "type": "string",
+          "enum": [
+            "ExtraCase"
+          ]
+        },
+        {
+          "description": "Structural difference",
+          "type": "string",
+          "enum": [
+            "Structure"
+          ]
+        }
+      ]
+    },
+    "DriftStatus": {
+      "description": "Overall drift status",
+      "oneOf": [
+        {
+          "description": "Implementations match",
+          "type": "string",
+          "enum": [
+            "Synced"
+          ]
+        },
+        {
+          "description": "Minor differences (warnings only)",
+          "type": "string",
+          "enum": [
+            "MinorDrift"
+          ]
+        },
+        {
+          "description": "Significant differences",
+          "type": "string",
+          "enum": [
+            "MajorDrift"
+          ]
+        },
+        {
+          "description": "Cannot compare",
+          "type": "string",
+          "enum": [
+            "Incomparable"
+          ]
+        }
+      ]
+    },
+    "DriftSummary": {
+      "description": "Summary statistics",
+      "type": "object",
+      "required": [
+        "errors",
+        "matching_rules",
+        "rules_a",
+        "rules_b",
+        "total_differences",
+        "warnings"
+      ],
+      "properties": {
+        "errors": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "matching_rules": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "rules_a": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "rules_b": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "total_differences": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "warnings": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "FileInfo": {
+      "description": "File information",
+      "type": "object",
+      "required": [
+        "function",
+        "hash",
+        "language"
+      ],
+      "properties": {
+        "function": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

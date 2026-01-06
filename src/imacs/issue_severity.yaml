@@ -1,0 +1,61 @@
+# Issue Severity Spec
+# Classifies code analysis issues by severity
+#
+# DOGFOODING: Used by analyze.rs to determine issue severity
+
+id: issue_severity
+name: "Code Analysis Issue Severity"
+
+inputs:
+  - name: issue_kind
+    type: !enum [HighComplexity, DeepNesting, LongFunction, MagicNumber, TooManyParams, MissingDefault]
+  - name: threshold_exceeded_by
+    type: !enum [None, Small, Large]
+    description: "How much the threshold is exceeded"
+
+outputs:
+  - name: severity
+    type: !enum [Info, Warning, Error]
+
+rules:
+  # High complexity
+  - id: complexity_error
+    when:
+      - issue_kind == 'HighComplexity'
+      - threshold_exceeded_by == 'Large'
+    then: "Error"
+
+  - id: complexity_warn
+    when:
+      - issue_kind == 'HighComplexity'
+    then: "Warning"
+
+  # Deep nesting - always warning
+  - id: nesting
+    when:
+      - issue_kind == 'DeepNesting'
+    then: "Warning"
+
+  # Long function - always warning
+  - id: long_func
+    when:
+      - issue_kind == 'LongFunction'
+    then: "Warning"
+
+  # Magic number - info only
+  - id: magic
+    when:
+      - issue_kind == 'MagicNumber'
+    then: "Info"
+
+  # Too many params - warning
+  - id: params
+    when:
+      - issue_kind == 'TooManyParams'
+    then: "Warning"
+
+  # Missing default - warning
+  - id: default
+    when:
+      - issue_kind == 'MissingDefault'
+    then: "Warning"

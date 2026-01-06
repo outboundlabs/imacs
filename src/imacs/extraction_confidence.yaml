@@ -1,0 +1,69 @@
+# Extraction Confidence Spec
+# Scores confidence when extracting specs from code
+#
+# DOGFOODING: Used by extract.rs to rate extraction quality
+
+id: extraction_confidence
+name: "Spec Extraction Confidence Scoring"
+
+inputs:
+  - name: pattern_type
+    type: !enum [Literal, Wildcard, Tuple, Constructor, Complex]
+  - name: has_guard
+    type: bool
+    description: "Does match arm have a guard clause?"
+  - name: output_type
+    type: !enum [Literal, Expression, FunctionCall, Complex]
+
+outputs:
+  - name: confidence
+    type: float
+    description: "0.0 to 1.0"
+
+rules:
+  # Direct literal pattern + literal output = high confidence
+  - id: literal_literal
+    when:
+      - pattern_type == 'Literal'
+      - output_type == 'Literal'
+      - "!has_guard"
+    then: 1.0
+
+  # Tuple of literals = high confidence
+  - id: tuple_literal
+    when:
+      - pattern_type == 'Tuple'
+      - output_type == 'Literal'
+      - "!has_guard"
+    then: 0.95
+
+  # Wildcard = slightly lower (catch-all)
+  - id: wildcard
+    when:
+      - pattern_type == 'Wildcard'
+      - output_type == 'Literal'
+    then: 0.85
+
+  # Has guard = lower confidence
+  - id: guarded
+    when:
+      - has_guard
+    then: 0.7
+
+  # Constructor pattern = medium
+  - id: constructor
+    when:
+      - pattern_type == 'Constructor'
+    then: 0.75
+
+  # Complex output = lower
+  - id: complex_output
+    when:
+      - output_type == 'FunctionCall'
+    then: 0.6
+
+  # Complex pattern = low (using OR - keep as single expression)
+  - id: complex
+    when:
+      - "pattern_type == 'Complex' || output_type == 'Complex'"
+    then: 0.4

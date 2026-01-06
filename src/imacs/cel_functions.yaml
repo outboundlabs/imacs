@@ -1,0 +1,355 @@
+# CEL Function Mapping Spec
+# Maps CEL built-in functions to target language equivalents
+#
+# DOGFOODING: Defines how size(), has(), startsWith(), etc. render
+
+id: cel_functions
+name: "CEL Function to Target Language"
+
+inputs:
+  - name: func
+    type: !enum [size, has, type, contains, startsWith, endsWith, matches, int, float, string]
+  - name: target
+    type: !enum [Rust, TypeScript, Python, CSharp, Java, Go]
+
+outputs:
+  - name: template
+    type: string
+    description: "Template with {0} for object, {1} for arg"
+
+rules:
+  # size() - length of collection
+  - id: size_rust
+    when:
+      - func == 'size'
+      - target == 'Rust'
+    then: "{0}.len()"
+
+  - id: size_ts
+    when:
+      - func == 'size'
+      - target == 'TypeScript'
+    then: "{0}.length"
+
+  - id: size_py
+    when:
+      - func == 'size'
+      - target == 'Python'
+    then: "len({0})"
+
+  # has() - existence check
+  - id: has_rust
+    when:
+      - func == 'has'
+      - target == 'Rust'
+    then: "{0}.is_some()"
+
+  - id: has_ts
+    when:
+      - func == 'has'
+      - target == 'TypeScript'
+    then: "({0} !== undefined)"
+
+  - id: has_py
+    when:
+      - func == 'has'
+      - target == 'Python'
+    then: "({0} is not None)"
+
+  # contains() - string/list contains
+  - id: contains_rust
+    when:
+      - func == 'contains'
+      - target == 'Rust'
+    then: "{0}.contains({1})"
+
+  - id: contains_ts
+    when:
+      - func == 'contains'
+      - target == 'TypeScript'
+    then: "{0}.includes({1})"
+
+  - id: contains_py
+    when:
+      - func == 'contains'
+      - target == 'Python'
+    then: "({1} in {0})"
+
+  # startsWith()
+  - id: startswith_rust
+    when:
+      - func == 'startsWith'
+      - target == 'Rust'
+    then: "{0}.starts_with({1})"
+
+  - id: startswith_ts
+    when:
+      - func == 'startsWith'
+      - target == 'TypeScript'
+    then: "{0}.startsWith({1})"
+
+  - id: startswith_py
+    when:
+      - func == 'startsWith'
+      - target == 'Python'
+    then: "{0}.startswith({1})"
+
+  # endsWith()
+  - id: endswith_rust
+    when:
+      - func == 'endsWith'
+      - target == 'Rust'
+    then: "{0}.ends_with({1})"
+
+  - id: endswith_ts
+    when:
+      - func == 'endsWith'
+      - target == 'TypeScript'
+    then: "{0}.endsWith({1})"
+
+  - id: endswith_py
+    when:
+      - func == 'endsWith'
+      - target == 'Python'
+    then: "{0}.endswith({1})"
+
+  # matches() - regex
+  - id: matches_rust
+    when:
+      - func == 'matches'
+      - target == 'Rust'
+    then: "Regex::new({1}).unwrap().is_match({0})"
+
+  - id: matches_ts
+    when:
+      - func == 'matches'
+      - target == 'TypeScript'
+    then: "{0}.match({1})"
+
+  - id: matches_py
+    when:
+      - func == 'matches'
+      - target == 'Python'
+    then: "re.match({1}, {0})"
+
+  # int() - convert to integer
+  - id: int_rust
+    when:
+      - func == 'int'
+      - target == 'Rust'
+    then: "{0} as i64"
+
+  - id: int_ts
+    when:
+      - func == 'int'
+      - target == 'TypeScript'
+    then: "parseInt({0})"
+
+  - id: int_py
+    when:
+      - func == 'int'
+      - target == 'Python'
+    then: "int({0})"
+
+  # float() - convert to float
+  - id: float_rust
+    when:
+      - func == 'float'
+      - target == 'Rust'
+    then: "{0} as f64"
+
+  - id: float_ts
+    when:
+      - func == 'float'
+      - target == 'TypeScript'
+    then: "parseFloat({0})"
+
+  - id: float_py
+    when:
+      - func == 'float'
+      - target == 'Python'
+    then: "float({0})"
+
+  # string() - convert to string
+  - id: string_rust
+    when:
+      - func == 'string'
+      - target == 'Rust'
+    then: "{0}.to_string()"
+
+  - id: string_ts
+    when:
+      - func == 'string'
+      - target == 'TypeScript'
+    then: "String({0})"
+
+  - id: string_py
+    when:
+      - func == 'string'
+      - target == 'Python'
+    then: "str({0})"
+
+  # C# functions
+  - id: size_csharp
+    when:
+      - func == 'size'
+      - target == 'CSharp'
+    then: "{0}.Count"
+
+  - id: has_csharp
+    when:
+      - func == 'has'
+      - target == 'CSharp'
+    then: "({0} != null)"
+
+  - id: contains_csharp
+    when:
+      - func == 'contains'
+      - target == 'CSharp'
+    then: "{0}.Contains({1})"
+
+  - id: startswith_csharp
+    when:
+      - func == 'startsWith'
+      - target == 'CSharp'
+    then: "{0}.StartsWith({1})"
+
+  - id: endswith_csharp
+    when:
+      - func == 'endsWith'
+      - target == 'CSharp'
+    then: "{0}.EndsWith({1})"
+
+  - id: matches_csharp
+    when:
+      - func == 'matches'
+      - target == 'CSharp'
+    then: "Regex.IsMatch({0}, {1})"
+
+  - id: int_csharp
+    when:
+      - func == 'int'
+      - target == 'CSharp'
+    then: "(long){0}"
+
+  - id: float_csharp
+    when:
+      - func == 'float'
+      - target == 'CSharp'
+    then: "(double){0}"
+
+  - id: string_csharp
+    when:
+      - func == 'string'
+      - target == 'CSharp'
+    then: "{0}.ToString()"
+
+  # Java functions
+  - id: size_java
+    when:
+      - func == 'size'
+      - target == 'Java'
+    then: "{0}.size()"
+
+  - id: has_java
+    when:
+      - func == 'has'
+      - target == 'Java'
+    then: "({0} != null)"
+
+  - id: contains_java
+    when:
+      - func == 'contains'
+      - target == 'Java'
+    then: "{0}.contains({1})"
+
+  - id: startswith_java
+    when:
+      - func == 'startsWith'
+      - target == 'Java'
+    then: "{0}.startsWith({1})"
+
+  - id: endswith_java
+    when:
+      - func == 'endsWith'
+      - target == 'Java'
+    then: "{0}.endsWith({1})"
+
+  - id: matches_java
+    when:
+      - func == 'matches'
+      - target == 'Java'
+    then: "{0}.matches({1})"
+
+  - id: int_java
+    when:
+      - func == 'int'
+      - target == 'Java'
+    then: "(long){0}"
+
+  - id: float_java
+    when:
+      - func == 'float'
+      - target == 'Java'
+    then: "(double){0}"
+
+  - id: string_java
+    when:
+      - func == 'string'
+      - target == 'Java'
+    then: "{0}.toString()"
+
+  # Go functions
+  - id: size_go
+    when:
+      - func == 'size'
+      - target == 'Go'
+    then: "len({0})"
+
+  - id: has_go
+    when:
+      - func == 'has'
+      - target == 'Go'
+    then: "({0} != nil)"
+
+  - id: contains_go
+    when:
+      - func == 'contains'
+      - target == 'Go'
+    then: "strings.Contains({0}, {1})"
+
+  - id: startswith_go
+    when:
+      - func == 'startsWith'
+      - target == 'Go'
+    then: "strings.HasPrefix({0}, {1})"
+
+  - id: endswith_go
+    when:
+      - func == 'endsWith'
+      - target == 'Go'
+    then: "strings.HasSuffix({0}, {1})"
+
+  - id: matches_go
+    when:
+      - func == 'matches'
+      - target == 'Go'
+    then: "regexp.MatchString({1}, {0})"
+
+  - id: int_go
+    when:
+      - func == 'int'
+      - target == 'Go'
+    then: "int64({0})"
+
+  - id: float_go
+    when:
+      - func == 'float'
+      - target == 'Go'
+    then: "float64({0})"
+
+  - id: string_go
+    when:
+      - func == 'string'
+      - target == 'Go'
+    then: "fmt.Sprintf(\"%v\", {0})"

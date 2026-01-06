@@ -1,0 +1,117 @@
+{# Java orchestrator template #}
+{% if package %}
+package {{ package }};
+
+{% endif %}
+{% if provenance %}
+// GENERATED FROM: {{ id }}.yaml
+// GENERATED: {{ generated_at }}
+// DO NOT EDIT - regenerate from spec
+
+{% endif %}
+import java.util.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class {{ id_pascal }}Orchestrator {
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    public static class Input {
+{% for input in inputs %}
+        public {{ input.java_type }} {{ input.name_camel }};
+{% endfor %}
+
+        public Input({% for input in inputs %}{{ input.java_type }} {{ input.name_camel }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+{% for input in inputs %}
+            this.{{ input.name_camel }} = {{ input.name_camel }};
+{% endfor %}
+        }
+    }
+
+    public static class Output {
+{% for output in outputs %}
+        public {{ output.java_type }} {{ output.name_camel }};
+{% endfor %}
+
+        public Output({% for output in outputs %}{{ output.java_type }} {{ output.name_camel }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+{% for output in outputs %}
+            this.{{ output.name_camel }} = {{ output.name_camel }};
+{% endfor %}
+        }
+    }
+
+    public static class Context {
+{% for step in steps %}
+{% if step.is_call %}
+        public JsonNode {{ step.id }};
+{% endif %}
+{% endfor %}
+    }
+
+    public static class {{ id_pascal }}Exception extends RuntimeException {
+        public final String step;
+        public final String type;
+
+        public {{ id_pascal }}Exception(String step, String type, String message) {
+            super(message);
+            this.step = step;
+            this.type = type;
+        }
+    }
+
+    public static Output execute(Input input) {
+        Context ctx = new Context();
+{% for step in steps %}
+{% if step.is_call %}
+{% if step.condition_java %}
+
+        // Step: {{ step.id }} (call {{ step.spec_id }}) - conditional
+        if ({{ step.condition_java }}) {
+{% endif %}
+        // Step: {{ step.id }} (call {{ step.spec_id }})
+        var {{ step.id }}Input = new {{ step.spec_id | pascal_case }}.Input(
+{% for mapping in step.input_mappings %}
+            {{ mapping.expr_java }}{% if not loop.last %},{% endif %}
+{% endfor %}
+        );
+        var {{ step.id }}Result = {{ step.spec_id | pascal_case }}.evaluate({{ step.id }}Input);
+        ctx.{{ step.id }} = mapper.valueToTree({{ step.id }}Result);
+{% if step.condition_java %}
+        }
+{% endif %}
+{% elif step.is_gate %}
+
+        // Gate: {{ step.id }}
+        if (!({{ step.condition_java }})) {
+            throw new {{ id_pascal }}Exception(
+                "{{ step.id }}",
+                "gate_failed",
+                "Gate condition failed: {{ step.condition }}"
+            );
+        }
+{% elif step.is_compute %}
+
+        // Compute: {{ step.id }}
+        // TODO: Implement compute step
+{% elif step.is_branch %}
+
+        // Branch: {{ step.id }}
+        if ({{ step.condition_java }}) {
+            // TODO: true branch
+        } else {
+            // TODO: false branch
+        }
+{% elif step.is_loop %}
+
+        // Loop: {{ step.id }}
+        // TODO: Implement loop
+{% endif %}
+{% endfor %}
+
+        return new Output(
+{% for output in outputs %}
+            null{% if not loop.last %},{% endif %}  // TODO: map output from context
+{% endfor %}
+        );
+    }
+}

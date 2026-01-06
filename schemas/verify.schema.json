@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VerificationResult",
+  "description": "Result of verification",
+  "type": "object",
+  "required": [
+    "code_hash",
+    "coverage",
+    "gaps",
+    "passed",
+    "spec_hash",
+    "warnings"
+  ],
+  "properties": {
+    "code_hash": {
+      "description": "Code hash",
+      "type": "string"
+    },
+    "coverage": {
+      "description": "Coverage information",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Coverage"
+        }
+      ]
+    },
+    "gaps": {
+      "description": "Gaps (uncovered rules)",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CoverageGap"
+      }
+    },
+    "passed": {
+      "description": "Whether verification passed",
+      "type": "boolean"
+    },
+    "spec_hash": {
+      "description": "Spec hash",
+      "type": "string"
+    },
+    "warnings": {
+      "description": "Warnings",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "definitions": {
+    "Coverage": {
+      "description": "Coverage statistics",
+      "type": "object",
+      "required": [
+        "covered",
+        "covered_rules",
+        "percentage",
+        "total",
+        "uncovered_rules"
+      ],
+      "properties": {
+        "covered": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "covered_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "percentage": {
+          "type": "number",
+          "format": "float"
+        },
+        "total": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "uncovered_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CoverageGap": {
+      "description": "A gap in coverage",
+      "type": "object",
+      "required": [
+        "expected_condition",
+        "expected_output",
+        "reason",
+        "rule_id",
+        "suggestion"
+      ],
+      "properties": {
+        "expected_condition": {
+          "type": "string"
+        },
+        "expected_output": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/definitions/GapReason"
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "suggestion": {
+          "type": "string"
+        }
+      }
+    },
+    "GapReason": {
+      "type": "string",
+      "enum": [
+        "Missing",
+        "ConditionMismatch",
+        "OutputMismatch"
+      ]
+    }
+  }
+}

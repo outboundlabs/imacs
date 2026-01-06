@@ -1,0 +1,36 @@
+id: access_level
+name: "User Access Level"
+
+inputs:
+  - name: role
+    type: string
+    values: [guest, member, admin]
+  - name: verified
+    type: bool
+
+outputs:
+  - name: level
+    type: int
+
+rules:
+  - id: R1
+    when:
+      - role == 'admin'
+    then: 100
+
+  - id: R2
+    when:
+      - role == 'member'
+      - verified
+    then: 50
+
+  - id: R3
+    when:
+      - role == 'member'
+      - "!verified"
+    then: 25
+
+  - id: R4
+    when:
+      - role == 'guest'
+    then: 10

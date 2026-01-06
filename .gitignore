@@ -1,0 +1,21 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
+# Editor
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+*.profraw
+coverage/
+
+# Local development
+.env
+.env.local

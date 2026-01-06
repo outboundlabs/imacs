@@ -1,0 +1,48 @@
+{# TypeScript spec template #}
+{% if module %}
+/**
+ * Module: {{ module }}
+ */
+
+{% endif %}
+{% if provenance %}
+// GENERATED FROM: {{ id }}.yaml
+// SPEC HASH: {{ spec_hash }}
+// GENERATED: {{ generated_at }}
+// DO NOT EDIT - regenerate from spec
+
+{% endif %}
+export interface {{ id_pascal }}Input {
+{% for input in inputs %}
+    {{ input.name_camel }}: {{ input.ts_type }};
+{% endfor %}
+}
+
+{% if outputs | length > 1 %}
+export interface {{ id_pascal }}Output {
+{% for output in outputs %}
+    {{ output.name_camel }}: {{ output.ts_type }};
+{% endfor %}
+}
+
+{% endif %}
+export function {{ id_camel }}(input: {{ id_pascal }}Input): {% if outputs | length > 1 %}{{ id_pascal }}Output{% else %}{{ outputs[0].ts_type }}{% endif %} {
+    const { {% for inp in inputs %}{{ inp.name_camel }}{% if not loop.last %}, {% endif %}{% endfor %} } = input;
+
+{% for rule in rules %}
+{% if loop.first %}
+    if ({{ rule.condition_ts }}) {
+{% else %}
+    } else if ({{ rule.condition_ts }}) {
+{% endif %}
+        // {{ rule.id }}
+        return {{ rule.output.ts }};
+{% endfor %}
+    } else {
+{% if default %}
+        return {{ default.ts }};
+{% else %}
+        throw new Error("No rule matched");
+{% endif %}
+    }
+}

@@ -1,0 +1,50 @@
+# AUTO-GENERATED - DO NOT EDIT
+# This file tracks spec file hashes for staleness detection
+# Regenerated automatically by 'imacs regen'
+
+spec_hashes:
+  order_flow.yaml: 5243113babd14d847265cac310e68dc829c38bbb2c55f54b5c9bb3929eca953f
+  shipping_rates.yaml: f5a8795a43a009fd1bf2adf14a7289128d722e1b2d17a48ead674cbe21bbb34a
+  access_level.yaml: 73d7711b37b072d9fa09834fffdea8cfa7f302659f0fbad4125b004cdc04fcdf
+generated_files:
+  access_level:
+  - access_level.rs
+  - access_level_test.rs
+  - access_level.ts
+  - access_level_test.ts
+  - access_level.py
+  - access_level_test.py
+  - access_level.cs
+  - access_level_test.cs
+  - access_level.go
+  - access_level_test.go
+  - access_level.java
+  - access_level_test.java
+  order_flow:
+  - order_flow.rs
+  - order_flow_test.rs
+  - order_flow.ts
+  - order_flow_test.ts
+  - order_flow.py
+  - order_flow_test.py
+  - order_flow.cs
+  - order_flow_test.cs
+  - order_flow.go
+  - order_flow_test.go
+  - order_flow.java
+  - order_flow_test.java
+  shipping_rate:
+  - shipping_rate.rs
+  - shipping_rate_test.rs
+  - shipping_rate.ts
+  - shipping_rate_test.ts
+  - shipping_rate.py
+  - shipping_rate_test.py
+  - shipping_rate.cs
+  - shipping_rate_test.cs
+  - shipping_rate.go
+  - shipping_rate_test.go
+  - shipping_rate.java
+  - shipping_rate_test.java
+generated_at: 1767626279
+tool_version: 0.0.1

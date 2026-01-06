@@ -1,0 +1,430 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExtractedSpec",
+  "description": "Result of extraction",
+  "type": "object",
+  "required": [
+    "confidence",
+    "questions",
+    "spec",
+    "warnings"
+  ],
+  "properties": {
+    "confidence": {
+      "description": "Confidence in extraction (0.0-1.0)",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Confidence"
+        }
+      ]
+    },
+    "questions": {
+      "description": "Questions for human review",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "spec": {
+      "description": "The extracted spec",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Spec"
+        }
+      ]
+    },
+    "warnings": {
+      "description": "Warnings",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "definitions": {
+    "Condition": {
+      "description": "A structured condition",
+      "type": "object",
+      "required": [
+        "value",
+        "var"
+      ],
+      "properties": {
+        "op": {
+          "description": "Comparison operator",
+          "default": "==",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConditionOp"
+            }
+          ]
+        },
+        "value": {
+          "description": "Value to compare against",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConditionValue"
+            }
+          ]
+        },
+        "var": {
+          "description": "Variable name",
+          "type": "string"
+        }
+      }
+    },
+    "ConditionOp": {
+      "description": "Comparison operators",
+      "type": "string",
+      "enum": [
+        "==",
+        "!=",
+        "<",
+        "<=",
+        ">",
+        ">=",
+        "in",
+        "contains",
+        "startswith",
+        "endswith",
+        "matches"
+      ]
+    },
+    "ConditionValue": {
+      "description": "A condition value",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "type": "number",
+          "format": "double"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConditionValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ConditionValue"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "Confidence": {
+      "description": "Confidence levels",
+      "type": "object",
+      "required": [
+        "overall",
+        "rules"
+      ],
+      "properties": {
+        "overall": {
+          "description": "Overall confidence",
+          "type": "number",
+          "format": "float"
+        },
+        "rules": {
+          "description": "Per-rule confidence",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleConfidence"
+          }
+        }
+      }
+    },
+    "Output": {
+      "description": "Rule output",
+      "anyOf": [
+        {
+          "description": "Single value",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConditionValue"
+            }
+          ]
+        },
+        {
+          "description": "Named fields",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ConditionValue"
+          }
+        }
+      ]
+    },
+    "Rule": {
+      "description": "A decision rule",
+      "type": "object",
+      "required": [
+        "id",
+        "then"
+      ],
+      "properties": {
+        "conditions": {
+          "description": "Structured conditions (alternative to CEL)",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Condition"
+          }
+        },
+        "description": {
+          "description": "Description",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Rule identifier",
+          "type": "string"
+        },
+        "priority": {
+          "description": "Priority (lower = higher priority)",
+          "default": 0,
+          "type": "integer",
+          "format": "int32"
+        },
+        "then": {
+          "description": "Output value(s)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Output"
+            }
+          ]
+        },
+        "when": {
+          "description": "CEL condition expression",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "RuleConfidence": {
+      "type": "object",
+      "required": [
+        "confidence",
+        "reason",
+        "rule_id"
+      ],
+      "properties": {
+        "confidence": {
+          "type": "number",
+          "format": "float"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "rule_id": {
+          "type": "string"
+        }
+      }
+    },
+    "Spec": {
+      "title": "IMACS Spec",
+      "description": "Decision table specification",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "default": {
+          "description": "Default output if no rules match",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Output"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description": {
+          "description": "Description",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Unique identifier (used as function name)",
+          "type": "string"
+        },
+        "inputs": {
+          "description": "Input variables",
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Variable"
+          }
+        },
+        "meta": {
+          "description": "Metadata",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SpecMeta"
+            }
+          ]
+        },
+        "name": {
+          "description": "Human-readable name",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outputs": {
+          "description": "Output variables",
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Variable"
+          }
+        },
+        "rules": {
+          "description": "Decision rules",
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Rule"
+          }
+        }
+      }
+    },
+    "SpecMeta": {
+      "description": "Spec metadata",
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "updated": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "VarType": {
+      "description": "Variable types",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "bool",
+            "int",
+            "float",
+            "string",
+            "object"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "enum"
+          ],
+          "properties": {
+            "enum": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "list"
+          ],
+          "properties": {
+            "list": {
+              "$ref": "#/definitions/VarType"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Variable": {
+      "description": "A variable (input or output)",
+      "type": "object",
+      "required": [
+        "name",
+        "type"
+      ],
+      "properties": {
+        "description": {
+          "description": "Description",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Variable name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Variable type",
+          "allOf": [
+            {
+              "$ref": "#/definitions/VarType"
+            }
+          ]
+        },
+        "values": {
+          "description": "For enums: valid values",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

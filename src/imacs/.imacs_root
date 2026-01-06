@@ -1,0 +1,22 @@
+# IMACS Project Root - v1
+# This is IMACS's own internal "dogfooding" specs
+version: 1
+imacs_version: ">=0.0.1"
+
+project:
+  name: imacs-internal
+  spec_id_prefix: ""
+
+defaults:
+  targets:
+    - rust
+  auto_format: true
+  naming:
+    code: "{spec_id}.{ext}"
+    tests: "{spec_id}_test.{ext}"
+
+validation:
+  require_unique_ids: true
+  require_descriptions: false
+  max_rules_per_spec: 50
+

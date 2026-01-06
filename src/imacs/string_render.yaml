@@ -1,0 +1,56 @@
+# String Rendering Spec
+# Defines how to render string literals per language
+#
+# DOGFOODING: Handles escaping and quote style
+
+id: string_render
+name: "String Literal Rendering"
+
+inputs:
+  - name: target
+    type: !enum [Rust, TypeScript, Python]
+  - name: needs_owned
+    type: bool
+    description: "Rust: does context need String vs &str?"
+
+outputs:
+  - name: quote
+    type: string
+  - name: suffix
+    type: string
+    description: "e.g., .to_string() for Rust owned"
+
+rules:
+  # Rust owned string
+  - id: rust_owned
+    when:
+      - target == 'Rust'
+      - needs_owned
+    then:
+      quote: "\""
+      suffix: ".to_string()"
+
+  # Rust borrowed
+  - id: rust_borrowed
+    when:
+      - target == 'Rust'
+      - "!needs_owned"
+    then:
+      quote: "\""
+      suffix: ""
+
+  # TypeScript
+  - id: ts
+    when:
+      - target == 'TypeScript'
+    then:
+      quote: "\""
+      suffix: ""
+
+  # Python (double quotes for consistency)
+  - id: py
+    when:
+      - target == 'Python'
+    then:
+      quote: "\""
+      suffix: ""

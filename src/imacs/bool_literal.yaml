@@ -1,0 +1,40 @@
+# Boolean Literal Mapping Spec
+# Maps boolean values to target language syntax
+#
+# DOGFOODING: Python uses True/False, others use true/false
+
+id: bool_literal
+name: "Boolean Literal Rendering"
+
+inputs:
+  - name: value
+    type: bool
+  - name: target
+    type: !enum [Rust, TypeScript, Python, CSharp, Java, Go]
+
+outputs:
+  - name: literal
+    type: string
+
+rules:
+  - id: true_py
+    when:
+      - value == true
+      - target == 'Python'
+    then: "True"
+
+  - id: false_py
+    when:
+      - value == false
+      - target == 'Python'
+    then: "False"
+
+  - id: true_default
+    when:
+      - value == true
+    then: "true"
+
+  - id: false_default
+    when:
+      - value == false
+    then: "false"

@@ -1,0 +1,45 @@
+{# Go spec template #}
+{% if provenance %}
+// GENERATED FROM: {{ id }}.yaml
+// SPEC HASH: {{ spec_hash }}
+// GENERATED: {{ generated_at }}
+// DO NOT EDIT - regenerate from spec
+
+{% endif %}
+{% if module_path %}
+// Module: {{ module_path }}
+{% endif %}
+package {{ package | default("generated") }}
+
+type {{ id_pascal }}Input struct {
+{% for input in inputs %}
+	{{ input.name_pascal }} {{ input.go_type }} `json:"{{ input.name }}"`
+{% endfor %}
+}
+
+{% if outputs | length > 1 %}
+type {{ id_pascal }}Output struct {
+{% for output in outputs %}
+	{{ output.name_pascal }} {{ output.go_type }} `json:"{{ output.name }}"`
+{% endfor %}
+}
+
+{% endif %}
+func {{ id_pascal }}(input {{ id_pascal }}Input) {% if outputs | length > 1 %}{{ id_pascal }}Output{% else %}{{ outputs[0].go_type }}{% endif %} {
+{% for rule in rules %}
+{% if loop.first %}
+	if {{ rule.condition_go }} {
+{% else %}
+	} else if {{ rule.condition_go }} {
+{% endif %}
+		// {{ rule.id }}
+		return {{ rule.output.go }}
+{% endfor %}
+	} else {
+{% if default %}
+		return {{ default.go }}
+{% else %}
+		panic("No rule matched")
+{% endif %}
+	}
+}

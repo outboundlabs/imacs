@@ -1,0 +1,65 @@
+{# C# spec template #}
+{% if provenance %}
+// GENERATED FROM: {{ id }}.yaml
+// SPEC HASH: {{ spec_hash }}
+// GENERATED: {{ generated_at }}
+// DO NOT EDIT - regenerate from spec
+
+{% endif %}
+using System;
+using System.Collections.Generic;
+
+{% if namespace %}
+namespace {{ namespace }}
+{
+{% endif %}
+public class {{ id_pascal }}Input
+{
+{% for input in inputs %}
+    public {{ input.csharp_type }} {{ input.name_pascal }} { get; set; }
+{% endfor %}
+}
+
+{% if outputs | length > 1 %}
+public class {{ id_pascal }}Output
+{
+{% for output in outputs %}
+    public {{ output.csharp_type }} {{ output.name_pascal }} { get; set; }
+{% endfor %}
+}
+
+{% endif %}
+public static class {{ id_pascal }}
+{
+    public static {% if outputs | length > 1 %}{{ id_pascal }}Output{% else %}{{ outputs[0].csharp_type }}{% endif %} Evaluate({{ id_pascal }}Input input)
+    {
+{% for input in inputs %}
+        var {{ input.name_camel }} = input.{{ input.name_pascal }};
+{% endfor %}
+
+{% for rule in rules %}
+{% if loop.first %}
+        if ({{ rule.condition_csharp }})
+        {
+{% else %}
+        }
+        else if ({{ rule.condition_csharp }})
+        {
+{% endif %}
+            // {{ rule.id }}
+            return {{ rule.output.csharp }};
+{% endfor %}
+        }
+        else
+        {
+{% if default %}
+            return {{ default.csharp }};
+{% else %}
+            throw new InvalidOperationException("No rule matched");
+{% endif %}
+        }
+    }
+}
+{% if namespace %}
+}
+{% endif %}

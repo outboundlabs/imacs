@@ -1,0 +1,28 @@
+id: pricing
+name: Pricing Rules
+inputs:
+  - name: customer_type
+    type: string
+    values: ["standard", "premium", "enterprise"]
+  - name: region
+    type: string
+    values: ["US", "EU", "APAC"]
+outputs:
+  - name: price_multiplier
+    type: float
+rules:
+  - id: R1
+    when:
+      - customer_type == "enterprise"
+      - region == "US"
+    then: 0.8
+  - id: R2
+    when:
+      - customer_type == "premium"
+      - region == "US"
+    then: 0.9
+  - id: R3
+    when:
+      - customer_type == "standard"
+    then: 1.0
+

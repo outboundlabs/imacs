@@ -1,0 +1,108 @@
+{# Python orchestrator template #}
+{%- if module %}
+"""
+Module: {{ module }}
+"""
+
+{% endif -%}
+{%- if provenance %}
+# GENERATED FROM: {{ id }}.yaml
+# GENERATED: {{ generated_at }}
+# DO NOT EDIT - regenerate from spec
+
+{% endif -%}
+from dataclasses import dataclass, field
+from typing import Any, Optional
+
+
+@dataclass
+class {{ id_pascal }}Input:
+{%- for input in inputs %}
+    {{ input.name }}: {{ input.py_type }}
+{%- endfor %}
+
+
+@dataclass
+class {{ id_pascal }}Output:
+{%- for output in outputs %}
+    {{ output.name }}: {{ output.py_type }}
+{%- endfor %}
+
+
+@dataclass
+class {{ id_pascal }}Context:
+{%- for step in steps %}
+{%- if step.is_call %}
+    {{ step.id }}: Optional[Any] = None
+{%- endif %}
+{%- endfor %}
+{%- if not steps | selectattr("is_call") | list %}
+    pass
+{%- endif %}
+
+
+class {{ id_pascal }}Error(Exception):
+    def __init__(self, step: str, error_type: str, message: str):
+        self.step = step
+        self.error_type = error_type
+        super().__init__(message)
+
+
+def {{ id }}(input: {{ id_pascal }}Input) -> {{ id_pascal }}Output:
+    ctx = {{ id_pascal }}Context()
+{%- for step in steps %}
+{%- if step.is_call %}
+{%- if step.condition_py %}
+
+    # Step: {{ step.id }} (call {{ step.spec_id }}) - conditional
+    if {{ step.condition_py }}:
+        {{ step.id }}_input = {{ step.spec_id | pascal_case }}Input(
+{%- for mapping in step.input_mappings %}
+            {{ mapping.spec_input_name }}={{ mapping.expr_py }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+        )
+        {{ step.id }}_result = {{ step.spec_id }}({{ step.id }}_input)
+        ctx.{{ step.id }} = {{ step.id }}_result
+{%- else %}
+
+    # Step: {{ step.id }} (call {{ step.spec_id }})
+    {{ step.id }}_input = {{ step.spec_id | pascal_case }}Input(
+{%- for mapping in step.input_mappings %}
+        {{ mapping.spec_input_name }}={{ mapping.expr_py }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+    )
+    {{ step.id }}_result = {{ step.spec_id }}({{ step.id }}_input)
+    ctx.{{ step.id }} = {{ step.id }}_result
+{%- endif %}
+{%- elif step.is_gate %}
+
+    # Gate: {{ step.id }}
+    if not ({{ step.condition_py }}):
+        raise {{ id_pascal }}Error(
+            "{{ step.id }}",
+            "gate_failed",
+            "Gate condition failed: {{ step.condition }}"
+        )
+{%- elif step.is_compute %}
+
+    # Compute: {{ step.id }}
+    # TODO: Implement compute step
+{%- elif step.is_branch %}
+
+    # Branch: {{ step.id }}
+    if {{ step.condition_py }}:
+        pass  # TODO: true branch
+    else:
+        pass  # TODO: false branch
+{%- elif step.is_loop %}
+
+    # Loop: {{ step.id }}
+    # TODO: Implement loop
+{%- endif %}
+{%- endfor %}
+
+    return {{ id_pascal }}Output(
+{%- for output in outputs %}
+        {{ output.name }}=None,  # TODO: map output from context
+{%- endfor %}
+    )

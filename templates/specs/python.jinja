@@ -1,0 +1,54 @@
+{# Python spec template #}
+{% if module %}
+"""
+Module: {{ module }}
+"""
+
+{% endif %}
+{% if provenance %}
+# GENERATED FROM: {{ id }}.yaml
+# SPEC HASH: {{ spec_hash }}
+# GENERATED: {{ generated_at }}
+# DO NOT EDIT - regenerate from spec
+
+{% endif %}
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass
+class {{ id_pascal }}Input:
+{% for input in inputs %}
+    {{ input.name }}: {{ input.py_type }}
+{% endfor %}
+
+
+{% if outputs | length > 1 %}
+@dataclass
+class {{ id_pascal }}Output:
+{% for output in outputs %}
+    {{ output.name }}: {{ output.py_type }}
+{% endfor %}
+
+
+{% endif %}
+def {{ id }}(input: {{ id_pascal }}Input) -> {% if outputs | length > 1 %}{{ id_pascal }}Output{% else %}{{ outputs[0].py_type }}{% endif %}:
+{% for input in inputs %}
+    {{ input.name }} = input.{{ input.name }}
+{% endfor %}
+
+{% for rule in rules %}
+{% if loop.first %}
+    if {{ rule.condition_py }}:
+{% else %}
+    elif {{ rule.condition_py }}:
+{% endif %}
+        # {{ rule.id }}
+        return {{ rule.output.py }}
+{% endfor %}
+    else:
+{% if default %}
+        return {{ default.py }}
+{% else %}
+        raise ValueError("No rule matched")
+{% endif %}

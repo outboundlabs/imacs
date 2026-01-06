@@ -1,0 +1,27 @@
+id: discounts
+name: Discount Rules
+inputs:
+  - name: customer_type
+    type: string
+    values: ["new", "returning", "vip"]
+  - name: amount
+    type: int
+outputs:
+  - name: discount_rate
+    type: float
+rules:
+  - id: R1
+    when:
+      - customer_type == "vip"
+      - amount > 1000
+    then: 0.2
+  - id: R2
+    when:
+      - customer_type == "returning"
+      - amount > 500
+    then: 0.1
+  - id: R3
+    when:
+      - customer_type == "new"
+    then: 0.0
+

@@ -1,0 +1,11 @@
+# Local configuration for IMACS internal specs
+# Generated code goes to src/generated/ (explicit output path)
+
+targets:
+  - rust
+
+auto_format: true
+
+output:
+  rust: "./generated"  # Relative to src/imacs parent (src/)
+
