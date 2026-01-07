@@ -100,7 +100,7 @@ pub fn validate_imacs_root(path: &Path) -> ConfigValidationResult {
     };
 
     // Try to parse YAML
-    let root: ImacRoot = match serde_yaml::from_str(&content) {
+    let root: ImacRoot = match serde_norway::from_str(&content) {
         Ok(r) => r,
         Err(e) => {
             result.issues.push(ConfigIssue::error(
@@ -203,7 +203,7 @@ pub fn validate_local_config(path: &Path) -> ConfigValidationResult {
     };
 
     // Try to parse YAML
-    let _config: LocalConfig = match serde_yaml::from_str(&content) {
+    let _config: LocalConfig = match serde_norway::from_str(&content) {
         Ok(c) => c,
         Err(e) => {
             result.issues.push(ConfigIssue::error(

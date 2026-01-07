@@ -16,8 +16,24 @@
 //!
 //! ## Example
 //!
-//! ```ignore
-//! use imacs::completeness::analyze_completeness;
+//! ```rust
+//! use imacs::{Spec, analyze_completeness};
+//!
+//! let spec = Spec::from_yaml(r#"
+//!   id: example
+//!   inputs:
+//!     - name: a
+//!       type: bool
+//!     - name: b
+//!       type: bool
+//!   outputs:
+//!     - name: result
+//!       type: int
+//!   rules:
+//!     - id: R1
+//!       when: "a && b"
+//!       then: 1
+//! "#).unwrap();
 //!
 //! let report = analyze_completeness(&spec);
 //! if !report.is_complete {

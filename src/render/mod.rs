@@ -701,7 +701,7 @@ rules:
         );
 
         let ast = result.unwrap();
-        assert!(ast.functions.len() >= 1, "Should have at least one method");
+        assert!(!ast.functions.is_empty(), "Should have at least one method");
     }
 
     #[test]
@@ -720,7 +720,7 @@ rules:
         );
 
         let ast = result.unwrap();
-        assert!(ast.functions.len() >= 1, "Should have at least one method");
+        assert!(!ast.functions.is_empty(), "Should have at least one method");
     }
 
     // =========================================================================

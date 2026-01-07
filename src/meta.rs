@@ -40,7 +40,7 @@ impl ImacMeta {
         }
 
         let content = std::fs::read_to_string(&meta_file).map_err(Error::Io)?;
-        let meta: ImacMeta = serde_yaml::from_str(&content)
+        let meta: ImacMeta = serde_norway::from_str(&content)
             .map_err(|e| Error::Other(format!("Failed to parse .imacs_meta.yaml: {}", e)))?;
 
         Ok(Some(meta))
@@ -58,7 +58,7 @@ impl ImacMeta {
              # Regenerated automatically by 'imacs regen'\n\n",
         );
 
-        let yaml = serde_yaml::to_string(self)
+        let yaml = serde_norway::to_string(self)
             .map_err(|e| Error::Other(format!("Failed to serialize metadata: {}", e)))?;
         content.push_str(&yaml);
 

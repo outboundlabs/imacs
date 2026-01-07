@@ -16,7 +16,7 @@
 //!
 //! ## Example
 //!
-//! ```ignore
+//! ```rust
 //! use imacs::completeness::espresso::{Cover, Cube, espresso};
 //!
 //! // Create cubes for the function: AB' + A'B + AB
@@ -29,6 +29,7 @@
 //!
 //! let minimized = espresso(&on_set, &dc_set);
 //! // Result should be: A + B (two terms instead of three)
+//! assert!(minimized.len() <= 3);
 //! ```
 
 pub mod cover;

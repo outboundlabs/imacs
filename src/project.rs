@@ -511,10 +511,12 @@ mod tests {
         let imacs_dir = temp.path().join("imacs");
         fs::create_dir_all(&imacs_dir).unwrap();
 
-        let mut output = OutputConfig::default();
         // Use simple paths without .. for testing
-        output.rust = Some("./rust_output".to_string());
-        output.typescript = Some("./ts_output".to_string());
+        let output = OutputConfig {
+            rust: Some("./rust_output".to_string()),
+            typescript: Some("./ts_output".to_string()),
+            ..Default::default()
+        };
 
         let config = MergedConfig {
             targets: vec![Target::Rust, Target::TypeScript],
@@ -543,9 +545,11 @@ mod tests {
         let imacs_dir = temp.path().join("imacs");
         fs::create_dir_all(&imacs_dir).unwrap();
 
-        let mut output = OutputConfig::default();
         // Use simple path without .. for testing
-        output.default = Some("./custom_output".to_string());
+        let output = OutputConfig {
+            default: Some("./custom_output".to_string()),
+            ..Default::default()
+        };
 
         let config = MergedConfig {
             targets: vec![Target::Rust],

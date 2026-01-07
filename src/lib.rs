@@ -29,8 +29,8 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust,ignore
-//! use imacs::{Spec, verify, render, generate_tests, Target};
+//! ```rust
+//! use imacs::{Spec, render, generate_tests, Target};
 //!
 //! // Parse a spec
 //! let spec = Spec::from_yaml(r#"
@@ -53,7 +53,7 @@
 //!     - id: R3
 //!       when: "!rate_exceeded && valid_creds"
 //!       then: 200
-//! "#)?;
+//! "#).unwrap();
 //!
 //! // Generate code
 //! let rust_code = render(&spec, Target::Rust);
@@ -62,16 +62,17 @@
 //! // Generate tests
 //! let tests = generate_tests(&spec, Target::Rust);
 //!
-//! // Verify existing code against spec
-//! let code_ast = imacs::parse_rust(&existing_code)?;
-//! let result = verify(&spec, &code_ast);
-//! if result.passed {
-//!     println!("✓ All {} rules verified", result.coverage.covered);
-//! } else {
-//!     for gap in result.gaps() {
-//!         println!("✗ Missing: {}", gap);
-//!     }
-//! }
+//! // Verify existing code against spec (example)
+//! // let existing_code = "fn login_check(rate_exceeded: bool, valid_creds: bool) -> i32 { ... }";
+//! // let code_ast = imacs::parse_rust(&existing_code).unwrap();
+//! // let result = imacs::verify(&spec, &code_ast);
+//! // if result.passed {
+//! //     println!("✓ All {} rules verified", result.coverage.covered);
+//! // } else {
+//! //     for gap in result.gaps() {
+//! //         println!("✗ Missing: {}", gap);
+//! //     }
+//! // }
 //! ```
 //!
 //! ## Spec Format

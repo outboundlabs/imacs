@@ -343,12 +343,12 @@ impl SpecMeta {
 impl Spec {
     /// Parse spec from YAML string
     pub fn from_yaml(yaml: &str) -> Result<Self> {
-        serde_yaml::from_str(yaml).map_err(|e| Error::SpecParse(e.to_string()))
+        serde_norway::from_str(yaml).map_err(|e| Error::SpecParse(e.to_string()))
     }
 
     /// Serialize spec to YAML string
     pub fn to_yaml(&self) -> Result<String> {
-        serde_yaml::to_string(self).map_err(|e| Error::SpecParse(e.to_string()))
+        serde_norway::to_string(self).map_err(|e| Error::SpecParse(e.to_string()))
     }
 
     /// Parse spec from JSON string

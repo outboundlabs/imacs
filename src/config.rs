@@ -185,7 +185,7 @@ impl ImacRoot {
         }
 
         let content = std::fs::read_to_string(&root_file).map_err(Error::Io)?;
-        let root: ImacRoot = serde_yaml::from_str(&content)
+        let root: ImacRoot = serde_norway::from_str(&content)
             .map_err(|e| Error::Other(format!("Failed to parse .imacs_root: {}", e)))?;
 
         // Validate version
@@ -254,7 +254,7 @@ impl LocalConfig {
         }
 
         let content = std::fs::read_to_string(&config_file).map_err(Error::Io)?;
-        let config: LocalConfig = serde_yaml::from_str(&content)
+        let config: LocalConfig = serde_norway::from_str(&content)
             .map_err(|e| Error::Other(format!("Failed to parse config.yaml: {}", e)))?;
 
         Ok(Some(config))
@@ -342,14 +342,16 @@ mod tests {
 
         let merged = root.merge(Some(&local));
         assert_eq!(merged.targets.len(), 2);
-        assert_eq!(merged.auto_format, true); // Inherited from root
+        assert!(merged.auto_format); // Inherited from root
     }
 
     #[test]
     fn test_merge_output_config() {
-        let mut root_output = OutputConfig::default();
-        root_output.default = Some("./generated".to_string());
-        root_output.rust = Some("./rust_gen".to_string());
+        let root_output = OutputConfig {
+            default: Some("./generated".to_string()),
+            rust: Some("./rust_gen".to_string()),
+            ..Default::default()
+        };
 
         let root = ImacRoot {
             version: 1,
@@ -367,8 +369,10 @@ mod tests {
             validation: ValidationConfig::default(),
         };
 
-        let mut local_output = OutputConfig::default();
-        local_output.typescript = Some("./ts_gen".to_string());
+        let local_output = OutputConfig {
+            typescript: Some("./ts_gen".to_string()),
+            ..Default::default()
+        };
 
         let local = LocalConfig {
             targets: None,

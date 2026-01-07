@@ -59,8 +59,8 @@ pub struct Orchestrator {
 
 impl Orchestrator {
     /// Parse orchestrator from YAML
-    pub fn from_yaml(yaml: &str) -> Result<Self, serde_yaml::Error> {
-        serde_yaml::from_str(yaml)
+    pub fn from_yaml(yaml: &str) -> Result<Self, serde_norway::Error> {
+        serde_norway::from_str(yaml)
     }
 
     /// Get all specs referenced by this orchestrator
