@@ -158,7 +158,7 @@ fn test_extract_predicates_or_expression() {
 #[test]
 fn test_extract_predicates_ternary() {
     let preds = extract_predicates("a ? b : c").unwrap();
-    assert!(preds.len() >= 1);
+    assert!(!preds.is_empty());
 }
 
 #[test]

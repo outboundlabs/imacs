@@ -64,10 +64,28 @@ pub enum TransformationKind {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use imacs::completeness::minimize;
+/// ```rust
+/// use imacs::{Spec, minimize};
 ///
-/// let spec = Spec::from_yaml(yaml)?;
+/// let spec = Spec::from_yaml(r#"
+///   id: example
+///   inputs:
+///     - name: a
+///       type: bool
+///     - name: b
+///       type: bool
+///   outputs:
+///     - name: result
+///       type: int
+///   rules:
+///     - id: R1
+///       when: "a && b"
+///       then: 1
+///     - id: R2
+///       when: "a && !b"
+///       then: 2
+/// "#).unwrap();
+///
 /// let result = minimize(&spec);
 ///
 /// if result.was_simplified {
@@ -243,10 +261,25 @@ pub struct VariableGroup {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use imacs::completeness::decompose;
+/// ```rust
+/// use imacs::{Spec, decompose};
 ///
-/// let spec = Spec::from_yaml(yaml)?;
+/// let spec = Spec::from_yaml(r#"
+///   id: example
+///   inputs:
+///     - name: a
+///       type: bool
+///     - name: b
+///       type: bool
+///   outputs:
+///     - name: result
+///       type: int
+///   rules:
+///     - id: R1
+///       when: "a"
+///       then: 1
+/// "#).unwrap();
+///
 /// let result = decompose(&spec);
 ///
 /// if result.can_decompose {
@@ -453,12 +486,29 @@ pub struct ComposedSpec {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use imacs::completeness::{compose, ChainDefinition};
+/// ```rust
+/// use imacs::{Spec, compose, ChainDefinition};
+/// use std::collections::HashMap;
+///
+/// let mut specs = HashMap::new();
+/// let spec1 = Spec::from_yaml(r#"
+///   id: validate_user
+///   inputs:
+///     - name: user_id
+///       type: int
+///   outputs:
+///     - name: valid
+///       type: bool
+///   rules:
+///     - id: R1
+///       when: "user_id > 0"
+///       then: true
+/// "#).unwrap();
+/// specs.insert("validate_user".to_string(), spec1);
 ///
 /// let chain = ChainDefinition {
-///     spec_ids: vec!["validate_user".into(), "check_permissions".into()],
-///     mappings: vec![...],
+///     spec_ids: vec!["validate_user".into()],
+///     mappings: vec![],
 /// };
 ///
 /// let result = compose(&specs, &chain);
@@ -579,10 +629,14 @@ pub struct OrchestratorExtractionResult {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use imacs::completeness::extract_spec_from_orchestrator;
+/// ```rust
+/// use imacs::{extract_spec_from_orchestrator, Orchestrator};
 ///
-/// let orch = Orchestrator::from_yaml(yaml)?;
+/// let yaml = r#"
+/// id: example
+/// steps: []
+/// "#;
+/// let orch = Orchestrator::from_yaml(yaml).unwrap();
 /// let result = extract_spec_from_orchestrator(&orch);
 ///
 /// for spec in result.extracted_specs {

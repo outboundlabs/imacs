@@ -1,6 +1,6 @@
 [package]
 name = "imacs"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 rust-version = "1.88"
 authors = ["IMACS Contributors"]
@@ -17,56 +17,56 @@ include = ["src/**/*", "README.md", "LICENSE", "CHANGELOG.md"]
 [dependencies]
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+serde_norway = "0.9"
 serde_json = "1.0"
 
 # Parsing - versions aligned with context crate
-tree-sitter = "0.24"
-tree-sitter-rust = "0.23"
+tree-sitter = "0.26"
+tree-sitter-rust = "0.24"
 tree-sitter-typescript = "0.23"
-tree-sitter-python = "0.23"
-tree-sitter-go = "0.23"
+tree-sitter-python = "0.25"
+tree-sitter-go = "0.25"
 tree-sitter-java = "0.23"
 tree-sitter-c-sharp = "0.23"
 cel-parser = "0.6"
 cel-interpreter = "0.10"
 
 # Utilities
-thiserror = "1.0"
+thiserror = "2.0"
 sha2 = "0.10"
 hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
 
 # Code generation
-genco = "0.17"
+genco = "0.19"
 
 # Template engine for code generation
-minijinja = { version = "2.5", features = ["loader"] }
+minijinja = { version = "2.14", features = ["loader"] }
 
 # Code formatting
 prettyplease = "0.2"
 syn = { version = "2.0", features = ["full", "parsing"] }
 
 # JSON Schema
-schemars = "0.8"
+schemars = "1.2"
 
 # Completeness analysis (Phase 5)
 quine-mc_cluskey = "0.2"  # Pure Rust Quine-McCluskey implementation
 
 # Self-update capability
-self_update = { version = "0.41", default-features = false, features = [
+self_update = { version = "0.42", default-features = false, features = [
   "archive-tar",
   "archive-zip",
   "compression-flate2",
   "rustls"
 ] }
-update-informer = "1.1"
+update-informer = "1.3"
 
 [dev-dependencies]
 proptest = "1.0"
 pretty_assertions = "1.4"
-rstest = "0.18"
+rstest = "0.26"
 cargo-llvm-cov = "0.6"
 tempfile = "3.10"
 
