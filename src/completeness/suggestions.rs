@@ -95,17 +95,18 @@ pub fn generate_suggestions(
                     code_counter += 1;
                 }
 
-                // Suggestion 2: Namespace
+                // Suggestion 2: Namespace - infer prefix from spec IDs
+                let prefix = infer_namespace_prefix(&affected_specs);
                 suggestions.push(Suggestion {
                     code: format!("S{:03}", code_counter),
                     category: SuggestionCategory::Namespace,
                     description: format!(
-                        "Add namespace prefix to '{}' in all specs",
-                        collision.variable_name
+                        "Add namespace prefix '{}' to '{}' in all specs",
+                        prefix, collision.variable_name
                     ),
                     affected_specs: affected_specs.clone(),
                     fix: SuggestedFix::Namespace {
-                        prefix: "domain".into(), // TODO: infer from spec context
+                        prefix,
                         variables: vec![collision.variable_name.clone()],
                     },
                 });
@@ -208,6 +209,52 @@ pub fn generate_suggestions(
     }
 
     suggestions
+}
+
+/// Infer a namespace prefix from spec IDs
+///
+/// Strategies:
+/// 1. Find common prefix among spec IDs
+/// 2. Use first spec's domain hint (e.g., "payment_rules" -> "payment")
+/// 3. Fall back to abbreviated form of spec IDs
+fn infer_namespace_prefix(spec_ids: &[String]) -> String {
+    if spec_ids.is_empty() {
+        return "ns".to_string();
+    }
+
+    // Try to find common prefix
+    if spec_ids.len() >= 2 {
+        let first = &spec_ids[0];
+        let mut common_len = 0;
+
+        'outer: for (i, c) in first.chars().enumerate() {
+            for id in spec_ids.iter().skip(1) {
+                if id.chars().nth(i) != Some(c) {
+                    break 'outer;
+                }
+            }
+            common_len = i + 1;
+        }
+
+        // If we have a meaningful common prefix (at least 3 chars), use it
+        if common_len >= 3 {
+            let prefix: String = first.chars().take(common_len).collect();
+            // Trim trailing underscores
+            return prefix.trim_end_matches('_').to_string();
+        }
+    }
+
+    // Try to extract domain from first spec ID (e.g., "payment_rules" -> "payment")
+    let first = &spec_ids[0];
+    if let Some(underscore_pos) = first.find('_') {
+        let domain = &first[..underscore_pos];
+        if domain.len() >= 3 {
+            return domain.to_string();
+        }
+    }
+
+    // Fall back to abbreviated first spec ID (first 4 chars)
+    first.chars().take(4).collect()
 }
 
 #[cfg(test)]

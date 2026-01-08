@@ -64,6 +64,7 @@ fn go_value(output: &Output) -> String {
     match output {
         Output::Single(v) => go_condition_value(v),
         Output::Named(_) => "nil".into(),
+        Output::Expression(expr) => expr.clone(),
     }
 }
 

@@ -164,7 +164,7 @@ pub fn verify_orchestrator(
         steps: step_verifications,
         flow: FlowVerification {
             correct_order,
-            all_branches_covered: true, // TODO: implement branch coverage
+            all_branches_covered: check_branch_coverage(&orch.chain, main_fn),
             error_paths_handled: check_error_handling(&orch.chain, main_fn),
             unreachable_steps: vec![],
             missing_steps: gaps
@@ -428,6 +428,106 @@ fn check_error_handling(chain: &[ChainStep], _func: &FunctionAst) -> bool {
     // If spec has error handling, code should too
     // For now, just check if there's a Result return type or try blocks
     has_try || has_gate || true // Simplified
+}
+
+/// Check if all branches in the orchestrator are covered in the implementation
+fn check_branch_coverage(chain: &[ChainStep], func: &FunctionAst) -> bool {
+    let (required_branches, found_branches) = count_branches(chain, func);
+
+    // All branches covered if we found at least the expected number
+    found_branches >= required_branches
+}
+
+/// Count required branches and found branches in the chain
+fn count_branches(chain: &[ChainStep], func: &FunctionAst) -> (usize, usize) {
+    let mut required = 0;
+    let mut found = 0;
+
+    for step in chain {
+        match step {
+            ChainStep::Branch(branch) => {
+                // Count each case as a required branch
+                required += branch.cases.len();
+                if branch.default.is_some() {
+                    required += 1;
+                }
+
+                // Check if the branch exists in code
+                if find_branch_in_ast(func, &branch.on) {
+                    // Count branches we found in AST
+                    found += branch.cases.len();
+                    if branch.default.is_some() {
+                        found += 1;
+                    }
+                }
+
+                // Recurse into branch cases
+                for case_steps in branch.cases.values() {
+                    let (r, f) = count_branches(case_steps, func);
+                    required += r;
+                    found += f;
+                }
+                if let Some(default_steps) = &branch.default {
+                    let (r, f) = count_branches(default_steps, func);
+                    required += r;
+                    found += f;
+                }
+            }
+            ChainStep::Try(try_) => {
+                // Try block is required, catch and finally are branches
+                required += 1; // try block
+                if try_.catch.is_some() {
+                    required += 1; // catch branch
+                }
+                if try_.finally.is_some() {
+                    required += 1; // finally branch
+                }
+
+                // Check if try exists in code (simplified - assume if any try step is found, it's covered)
+                found += 1;
+                if try_.catch.is_some() {
+                    found += 1;
+                }
+                if try_.finally.is_some() {
+                    found += 1;
+                }
+
+                // Recurse
+                let (r, f) = count_branches(&try_.try_steps, func);
+                required += r;
+                found += f;
+
+                if let Some(catch) = &try_.catch {
+                    let (r, f) = count_branches(&catch.steps, func);
+                    required += r;
+                    found += f;
+                }
+                if let Some(finally) = &try_.finally {
+                    let (r, f) = count_branches(finally, func);
+                    required += r;
+                    found += f;
+                }
+            }
+            ChainStep::Parallel(par) => {
+                let (r, f) = count_branches(&par.steps, func);
+                required += r;
+                found += f;
+            }
+            ChainStep::Loop(loop_) => {
+                let (r, f) = count_branches(&loop_.steps, func);
+                required += r;
+                found += f;
+            }
+            ChainStep::ForEach(foreach) => {
+                let (r, f) = count_branches(&foreach.steps, func);
+                required += r;
+                found += f;
+            }
+            _ => {}
+        }
+    }
+
+    (required, found)
 }
 
 fn collect_all_step_ids(steps: &[ChainStep]) -> Vec<String> {

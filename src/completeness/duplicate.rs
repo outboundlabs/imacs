@@ -65,7 +65,9 @@ pub fn detect_duplicates(specs: &[(String, &Spec)]) -> Vec<Duplicate> {
             for rule_a in &spec_a.rules {
                 for rule_b in &spec_b.rules {
                     if let (Some(cel_a), Some(cel_b)) = (rule_a.as_cel(), rule_b.as_cel()) {
-                        if let Some(overlap) = check_rule_overlap(&cel_a, &cel_b, &combined_set) {
+                        if let Some((overlap, confidence)) =
+                            check_rule_overlap(&cel_a, &cel_b, &combined_set)
+                        {
                             duplicates.push(Duplicate {
                                 rule_a: RuleRef {
                                     spec_id: spec_a_id.clone(),
@@ -78,7 +80,7 @@ pub fn detect_duplicates(specs: &[(String, &Spec)]) -> Vec<Duplicate> {
                                     cel_condition: Some(cel_b.clone()),
                                 },
                                 overlap_cel: overlap,
-                                confidence: 0.8, // TODO: compute actual confidence
+                                confidence,
                             });
                         }
                     }
@@ -91,7 +93,12 @@ pub fn detect_duplicates(specs: &[(String, &Spec)]) -> Vec<Duplicate> {
 }
 
 /// Check if two CEL expressions overlap (cover same input space)
-fn check_rule_overlap(cel_a: &str, cel_b: &str, predicate_set: &PredicateSet) -> Option<String> {
+/// Returns (overlap_cel, confidence) if overlap exists
+fn check_rule_overlap(
+    cel_a: &str,
+    cel_b: &str,
+    predicate_set: &PredicateSet,
+) -> Option<(String, f64)> {
     // Convert both to cubes
     let cube_a = match crate::completeness::adapter::expression_to_cube(cel_a, predicate_set) {
         Ok(c) => c,
@@ -104,28 +111,64 @@ fn check_rule_overlap(cel_a: &str, cel_b: &str, predicate_set: &PredicateSet) ->
 
     // Check if cubes overlap (both have 1 for same predicates)
     let mut overlap_predicates = Vec::new();
-    let mut has_overlap = false;
+    let mut matching_predicates = 0;
+    let mut total_set_predicates = 0;
+    let mut conflicting_predicates = 0;
 
     for (idx, pred) in predicate_set.predicates.iter().enumerate() {
         let val_a = cube_a.input(idx);
         let val_b = cube_b.input(idx);
 
-        // Both must be set (not don't-care) and same value
-        if val_a == val_b && val_a != crate::completeness::espresso::CubeValue::DontCare {
-            has_overlap = true;
+        let dc = crate::completeness::espresso::CubeValue::DontCare;
+
+        // Count predicates that are set (not don't-care) in either rule
+        if val_a != dc || val_b != dc {
+            total_set_predicates += 1;
+        }
+
+        // Both set and same value = matching
+        if val_a == val_b && val_a != dc {
+            matching_predicates += 1;
             if val_a == crate::completeness::espresso::CubeValue::One {
                 overlap_predicates.push(pred.to_cel_string());
             } else {
                 overlap_predicates.push(format!("!{}", pred.to_cel_string()));
             }
         }
+        // Both set but different value = conflict
+        else if val_a != dc && val_b != dc && val_a != val_b {
+            conflicting_predicates += 1;
+        }
     }
 
-    if has_overlap {
-        Some(overlap_predicates.join(" && "))
-    } else {
-        None
+    // Rules with conflicts can't be duplicates
+    if conflicting_predicates > 0 {
+        return None;
     }
+
+    // Need some overlap to be considered duplicate
+    if matching_predicates == 0 {
+        return None;
+    }
+
+    // Compute confidence based on how similar the rules are
+    // Higher confidence = more predicates matching, fewer don't-cares
+    let confidence = if total_set_predicates > 0 {
+        // Base confidence on matching ratio
+        let base = matching_predicates as f64 / total_set_predicates as f64;
+
+        // Boost confidence if rules are identical (same number of predicates)
+        if matching_predicates == total_set_predicates {
+            1.0 // Exact duplicate
+        } else {
+            // Scale between 0.5 and 0.95 based on overlap
+            0.5 + (base * 0.45)
+        }
+    } else {
+        0.5 // Default for edge case
+    };
+
+    Some((overlap_predicates.join(" && "), confidence))
 }
 
 #[cfg(test)]

@@ -77,7 +77,12 @@
       "Bash(rm:*)",
       "Bash(cargo test:*)",
       "Bash(sccache --show-stats:*)",
-      "Bash(cargo clean:*)"
+      "Bash(cargo clean:*)",
+      "Bash(curl:*)",
+      "Bash(./target/debug/imacs:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo fmt:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }
