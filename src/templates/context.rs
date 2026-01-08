@@ -412,6 +412,16 @@ impl OutputValueView {
                 named: None,
             },
             Output::Named(map) => build_named(map),
+            Output::Expression(expr) => Self {
+                is_single: true,
+                rust: CelCompiler::compile(expr, Target::Rust).unwrap_or_else(|_| expr.clone()),
+                ts: CelCompiler::compile(expr, Target::TypeScript).unwrap_or_else(|_| expr.clone()),
+                py: CelCompiler::compile(expr, Target::Python).unwrap_or_else(|_| expr.clone()),
+                go: CelCompiler::compile(expr, Target::Go).unwrap_or_else(|_| expr.clone()),
+                java: CelCompiler::compile(expr, Target::Java).unwrap_or_else(|_| expr.clone()),
+                csharp: CelCompiler::compile(expr, Target::CSharp).unwrap_or_else(|_| expr.clone()),
+                named: None,
+            },
         }
     }
 }

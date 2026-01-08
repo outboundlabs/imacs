@@ -77,6 +77,7 @@ fn java_value(output: &Output) -> String {
     match output {
         Output::Single(v) => java_condition_value(v),
         Output::Named(_) => "new Object()".into(),
+        Output::Expression(expr) => expr.clone(),
     }
 }
 

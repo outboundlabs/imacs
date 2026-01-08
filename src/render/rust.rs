@@ -247,6 +247,9 @@ impl<'a> RustRenderer<'a> {
                     .collect();
                 format!("{{ {} }}", fields.join(", "))
             }
+            Output::Expression(expr) => {
+                CelCompiler::compile(expr, Target::Rust).unwrap_or_else(|_| expr.clone())
+            }
         }
     }
 
@@ -283,6 +286,9 @@ impl<'a> RustRenderer<'a> {
             Output::Named(m) => Some(m),
             Output::Single(ConditionValue::Map(m)) => Some(m),
             Output::Single(v) => return self.render_condition_value(v),
+            Output::Expression(expr) => {
+                return CelCompiler::compile(expr, Target::Rust).unwrap_or_else(|_| expr.clone())
+            }
         };
 
         let map = map.unwrap();

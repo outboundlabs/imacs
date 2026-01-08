@@ -293,10 +293,13 @@ impl std::fmt::Display for ConditionValue {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum Output {
-    /// Single value
+    /// Single value (literal)
     Single(ConditionValue),
     /// Named fields
     Named(HashMap<String, ConditionValue>),
+    /// Computed expression (CEL string)
+    /// Used for outputs like `calculate(x)` or `user.status`
+    Expression(String),
 }
 
 impl std::fmt::Display for Output {
@@ -307,6 +310,7 @@ impl std::fmt::Display for Output {
                 let pairs: Vec<_> = m.iter().map(|(k, v)| format!("{}: {}", k, v)).collect();
                 write!(f, "{{ {} }}", pairs.join(", "))
             }
+            Output::Expression(expr) => write!(f, "${{{}}}", expr),
         }
     }
 }
