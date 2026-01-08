@@ -4,8 +4,12 @@
 
 	// Use a persistent volume for the cargo cache to speed up rebuilds
 	"mounts": [
-		"source=devcontainer-cargo-cache-${devcontainerId},target=/usr/local/cargo/registry,type=volume"
+		"source=devcontainer-cargo-cache-${devcontainerId},target=/home/vscode/.cargo/registry,type=volume"
 	],
+
+	"remoteEnv": {
+		"CARGO_HOME": "/home/vscode/.cargo"
+	},
 
 	"features": {
 		"ghcr.io/devcontainers/features/node:1": {

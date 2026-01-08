@@ -71,7 +71,13 @@
       "Bash(git status:*)",
       "Bash(git show:*)",
       "Bash(CARGO_HOME=/tmp/cargo cargo clean:*)",
-      "Bash(RUST_BACKTRACE=1 ./target/release/imacs render:*)"
+      "Bash(RUST_BACKTRACE=1 ./target/release/imacs render:*)",
+      "Bash(sccache --version:*)",
+      "Bash(cargo install:*)",
+      "Bash(rm:*)",
+      "Bash(cargo test:*)",
+      "Bash(sccache --show-stats:*)",
+      "Bash(cargo clean:*)"
     ]
   }
 }
