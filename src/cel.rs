@@ -401,7 +401,7 @@ impl CelCompiler {
                 }
             }
 
-            _ => format!("/* unsupported expr type */"),
+            _ => "/* unsupported expr type */".to_string(),
         }
     }
 

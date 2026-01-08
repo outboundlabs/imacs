@@ -482,12 +482,9 @@ fn check_ast_types(
                 if call.args.len() == 2 {
                     check_comparable_types(&call.args[0], &call.args[1], var_types)?;
                 }
-            } else if call.func_name == operators::LOGICAL_AND {
-                if call.args.len() == 2 {
-                    check_ast_types(&call.args[0], var_types)?;
-                    check_ast_types(&call.args[1], var_types)?;
-                }
-            } else if call.func_name == operators::LOGICAL_OR {
+            } else if call.func_name == operators::LOGICAL_AND
+                || call.func_name == operators::LOGICAL_OR
+            {
                 if call.args.len() == 2 {
                     check_ast_types(&call.args[0], var_types)?;
                     check_ast_types(&call.args[1], var_types)?;
