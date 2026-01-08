@@ -11,7 +11,9 @@
 
 use crate::cel::CelCompiler;
 use crate::error::Result;
-use cel_parser::{Atom, Expression as CelExpr, Member, RelationOp};
+use cel_parser::ast::{operators, CallExpr, Expr};
+use cel_parser::reference::Val;
+pub use cel_parser::Expression as CelExpr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -299,10 +301,10 @@ pub fn extract_predicates(cel_expr: &str) -> Result<Vec<Predicate>> {
 
 /// Recursively extract predicates from CEL AST
 fn extract_from_ast(expr: &CelExpr, predicates: &mut Vec<Predicate>, negated: bool) {
-    match expr {
+    // In cel-parser 0.10, Expression is IdedExpr with expr field
+    match &expr.expr {
         // Simple identifier - treat as boolean variable
-        // Always use positive form - negation is tracked by the caller
-        CelExpr::Ident(name) => {
+        Expr::Ident(name) => {
             let name_str = name.to_string();
             if name_str != "true" && name_str != "false" {
                 // Always store positive form of boolean variable
@@ -310,85 +312,89 @@ fn extract_from_ast(expr: &CelExpr, predicates: &mut Vec<Predicate>, negated: bo
             }
         }
 
-        // Relation: amount > 1000, status == "active"
-        CelExpr::Relation(left, op, right) => {
-            if let Some(pred) = extract_relation(left, op, right, negated) {
-                predicates.push(pred);
+        // Call expressions - operators and function calls
+        Expr::Call(call) => {
+            // Check for logical operators
+            if call.func_name == operators::LOGICAL_AND {
+                // AND: recurse into both sides
+                if call.args.len() == 2 {
+                    extract_from_ast(&call.args[0], predicates, negated);
+                    extract_from_ast(&call.args[1], predicates, negated);
+                }
+            } else if call.func_name == operators::LOGICAL_OR {
+                // OR: recurse into both sides
+                if call.args.len() == 2 {
+                    extract_from_ast(&call.args[0], predicates, negated);
+                    extract_from_ast(&call.args[1], predicates, negated);
+                }
+            } else if call.func_name == operators::LOGICAL_NOT {
+                // NOT: flip negation and recurse
+                if let Some(inner) = call.args.first() {
+                    extract_from_ast(inner, predicates, !negated);
+                }
+            } else if is_relation_op(&call.func_name) {
+                // Relation operator (==, !=, <, >, <=, >=)
+                if call.args.len() == 2 {
+                    if let Some(pred) = extract_relation_from_call(call, negated) {
+                        predicates.push(pred);
+                    }
+                }
+            } else {
+                // Other function calls - extract from arguments
+                for arg in &call.args {
+                    extract_from_ast(arg, predicates, negated);
+                }
             }
         }
 
-        // AND: recurse into both sides
-        CelExpr::And(left, right) => {
-            extract_from_ast(left, predicates, negated);
-            extract_from_ast(right, predicates, negated);
+        // Select expressions - member access
+        Expr::Select(select) => {
+            // Extract from base operand
+            extract_from_ast(&select.operand, predicates, negated);
         }
 
-        // OR: recurse into both sides
-        CelExpr::Or(left, right) => {
-            extract_from_ast(left, predicates, negated);
-            extract_from_ast(right, predicates, negated);
+        // List literals - extract from elements
+        Expr::List(list) => {
+            for item in &list.elements {
+                extract_from_ast(item, predicates, negated);
+            }
         }
 
-        // NOT: flip negation and recurse
-        CelExpr::Unary(cel_parser::UnaryOp::Not, inner) => {
-            extract_from_ast(inner, predicates, !negated);
-        }
+        // Map literals - no predicates (for now)
+        Expr::Map(_) => {}
 
-        // Negation (minus)
-        CelExpr::Unary(cel_parser::UnaryOp::Minus, inner) => {
-            extract_from_ast(inner, predicates, negated);
-        }
+        // Literals - no predicates
+        Expr::Literal(_) => {}
 
-        // Double not
-        CelExpr::Unary(cel_parser::UnaryOp::DoubleNot, inner) => {
-            extract_from_ast(inner, predicates, negated);
-        }
-
-        // Double minus
-        CelExpr::Unary(cel_parser::UnaryOp::DoubleMinus, inner) => {
-            extract_from_ast(inner, predicates, negated);
-        }
-
-        // Ternary: extract from all branches
-        CelExpr::Ternary(cond, true_branch, false_branch) => {
-            extract_from_ast(cond, predicates, negated);
-            extract_from_ast(true_branch, predicates, negated);
-            extract_from_ast(false_branch, predicates, negated);
-        }
-
-        // Member access (function calls like size(), has(), etc.)
-        CelExpr::Member(base, member) => {
-            extract_from_member(base, member, predicates, negated);
-        }
-
-        // List literals - no predicates
-        CelExpr::List(_) => {}
-
-        // Map literals - no predicates
-        CelExpr::Map(_) => {}
-
-        // Atoms (literals) - no predicates
-        CelExpr::Atom(_) => {}
-
-        // Arithmetic - recurse to find any embedded predicates
-        CelExpr::Arithmetic(left, _, right) => {
-            extract_from_ast(left, predicates, negated);
-            extract_from_ast(right, predicates, negated);
-        }
+        // Other expression types
+        _ => {}
     }
 }
 
-/// Extract predicate from a relation expression
-fn extract_relation(
-    left: &CelExpr,
-    op: &RelationOp,
-    right: &CelExpr,
-    negated: bool,
-) -> Option<Predicate> {
+/// Check if a function name is a relation operator
+fn is_relation_op(func_name: &str) -> bool {
+    func_name == operators::EQUALS
+        || func_name == operators::NOT_EQUALS
+        || func_name == operators::GREATER
+        || func_name == operators::LESS
+        || func_name == operators::GREATER_EQUALS
+        || func_name == operators::LESS_EQUALS
+        || func_name == operators::IN
+}
+
+/// Extract predicate from a relation Call expression
+fn extract_relation_from_call(call: &CallExpr, negated: bool) -> Option<Predicate> {
+    if call.args.len() != 2 {
+        return None;
+    }
+
+    let left = &call.args[0];
+    let right = &call.args[1];
+
     // Get variable name from left side
-    let var = match left {
-        CelExpr::Ident(name) => name.to_string(),
-        CelExpr::Member(_base, _) => {
+    let var = match &left.expr {
+        Expr::Ident(name) => name.to_string(),
+        Expr::Select(_select) => {
             // Handle nested member access like user.status
             format_member_path(left)
         }
@@ -396,9 +402,10 @@ fn extract_relation(
     };
 
     // Handle `in` operator first (RHS is a list, not a literal)
-    if *op == RelationOp::In {
-        if let CelExpr::List(items) = right {
-            let values: Vec<LiteralValue> = items.iter().filter_map(extract_literal).collect();
+    if call.func_name == operators::IN {
+        if let Expr::List(list) = &right.expr {
+            let values: Vec<LiteralValue> =
+                list.elements.iter().filter_map(extract_literal).collect();
             if !values.is_empty() {
                 return Some(Predicate::Membership {
                     var,
@@ -413,20 +420,20 @@ fn extract_relation(
     // Get literal value from right side (for non-list operators)
     let value = extract_literal(right)?;
 
-    match op {
-        RelationOp::Equals => Some(Predicate::Equality {
+    match call.func_name.as_str() {
+        operators::EQUALS => Some(Predicate::Equality {
             var,
             value,
             negated,
         }),
 
-        RelationOp::NotEquals => Some(Predicate::Equality {
+        operators::NOT_EQUALS => Some(Predicate::Equality {
             var,
             value,
             negated: !negated,
         }),
 
-        RelationOp::LessThan => {
+        operators::LESS => {
             let op = if negated {
                 ComparisonOp::Ge
             } else {
@@ -435,7 +442,7 @@ fn extract_relation(
             Some(Predicate::Comparison { var, op, value })
         }
 
-        RelationOp::LessThanEq => {
+        operators::LESS_EQUALS => {
             let op = if negated {
                 ComparisonOp::Gt
             } else {
@@ -444,7 +451,7 @@ fn extract_relation(
             Some(Predicate::Comparison { var, op, value })
         }
 
-        RelationOp::GreaterThan => {
+        operators::GREATER => {
             let op = if negated {
                 ComparisonOp::Le
             } else {
@@ -453,7 +460,7 @@ fn extract_relation(
             Some(Predicate::Comparison { var, op, value })
         }
 
-        RelationOp::GreaterThanEq => {
+        operators::GREATER_EQUALS => {
             let op = if negated {
                 ComparisonOp::Lt
             } else {
@@ -462,23 +469,23 @@ fn extract_relation(
             Some(Predicate::Comparison { var, op, value })
         }
 
-        RelationOp::In => unreachable!(), // Already handled above
+        _ => None,
     }
 }
 
 /// Extract literal value from CEL expression
 fn extract_literal(expr: &CelExpr) -> Option<LiteralValue> {
-    match expr {
-        CelExpr::Atom(atom) => match atom {
-            Atom::Int(i) => Some(LiteralValue::Int(*i)),
-            Atom::UInt(u) => Some(LiteralValue::Int(*u as i64)),
-            Atom::Float(f) => Some(LiteralValue::Float(*f)),
-            Atom::String(s) => Some(LiteralValue::String(s.to_string())),
-            Atom::Bool(b) => Some(LiteralValue::Bool(*b)),
-            Atom::Null => None,
-            Atom::Bytes(_) => None,
+    match &expr.expr {
+        Expr::Literal(val) => match val {
+            Val::Int(i) => Some(LiteralValue::Int(*i)),
+            Val::UInt(u) => Some(LiteralValue::Int(*u as i64)),
+            Val::Double(f) => Some(LiteralValue::Float(*f)),
+            Val::String(s) => Some(LiteralValue::String(s.to_string())),
+            Val::Boolean(b) => Some(LiteralValue::Bool(*b)),
+            Val::Null => None,
+            _ => None,
         },
-        CelExpr::Ident(name) => {
+        Expr::Ident(name) => {
             let s = name.to_string();
             if s == "true" {
                 Some(LiteralValue::Bool(true))
@@ -494,82 +501,17 @@ fn extract_literal(expr: &CelExpr) -> Option<LiteralValue> {
 
 /// Format member path like user.profile.status
 fn format_member_path(expr: &CelExpr) -> String {
-    match expr {
-        CelExpr::Ident(name) => name.to_string(),
-        CelExpr::Member(base, member) => {
-            let base_str = format_member_path(base);
-            match member.as_ref() {
-                Member::Attribute(attr) => format!("{}.{}", base_str, attr),
-                Member::Index(idx) => format!("{}[{}]", base_str, format_member_path(idx)),
-                Member::Fields(_) => base_str,
-                Member::FunctionCall(_) => base_str,
+    match &expr.expr {
+        Expr::Ident(name) => name.to_string(),
+        Expr::Select(select) => {
+            let base_str = format_member_path(&select.operand);
+            if !select.field.is_empty() {
+                format!("{}.{}", base_str, select.field)
+            } else {
+                base_str
             }
         }
         _ => "?".to_string(),
-    }
-}
-
-/// Extract predicates from member access (function calls)
-fn extract_from_member(
-    base: &CelExpr,
-    member: &Member,
-    predicates: &mut Vec<Predicate>,
-    negated: bool,
-) {
-    match member {
-        // Method call like str.startsWith("prefix")
-        Member::FunctionCall(args) => {
-            // Check if base is an identifier (top-level function call)
-            if let CelExpr::Ident(func_name) = base {
-                let _func = func_name.to_string();
-                // Functions like has(), size() - extract from args
-                for arg in args {
-                    extract_from_ast(arg, predicates, negated);
-                }
-                return;
-            }
-
-            // Method call on a variable
-            if let CelExpr::Member(obj, boxed_member) = base {
-                if let Member::Attribute(method) = boxed_member.as_ref() {
-                    let var = format_member_path(obj);
-                    let method_str = method.to_string();
-
-                    if let Some(arg_expr) = args.first() {
-                        if let Some(LiteralValue::String(arg)) = extract_literal(arg_expr) {
-                            let op = match method_str.as_str() {
-                                "startsWith" => Some(StringOpKind::StartsWith),
-                                "endsWith" => Some(StringOpKind::EndsWith),
-                                "contains" => Some(StringOpKind::Contains),
-                                "matches" => Some(StringOpKind::Matches),
-                                _ => None,
-                            };
-
-                            if let Some(op) = op {
-                                predicates.push(Predicate::StringOp {
-                                    var,
-                                    op,
-                                    arg,
-                                    negated,
-                                });
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Fallback: extract from base and args
-            extract_from_ast(base, predicates, negated);
-            for arg in args {
-                extract_from_ast(arg, predicates, negated);
-            }
-        }
-
-        // Attribute access - recurse on base
-        Member::Attribute(_) | Member::Index(_) | Member::Fields(_) => {
-            extract_from_ast(base, predicates, negated);
-        }
     }
 }
 

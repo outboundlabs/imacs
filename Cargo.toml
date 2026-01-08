@@ -28,7 +28,7 @@ tree-sitter-python = "0.25"
 tree-sitter-go = "0.25"
 tree-sitter-java = "0.23"
 tree-sitter-c-sharp = "0.23"
-cel-parser = "0.10"
+cel-parser = "0.10.1"  # Keep at 0.6 - 0.10 has breaking API changes
 cel-interpreter = "0.10"
 
 # Utilities

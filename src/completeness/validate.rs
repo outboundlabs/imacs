@@ -442,7 +442,7 @@ fn check_cel_types(
     var_types: &HashMap<String, crate::spec::VarType>,
 ) -> Result<(), String> {
     // Parse the expression
-    let ast = match cel_parser::parse(expr) {
+    let ast = match cel_parser::Parser::new().parse(expr) {
         Ok(ast) => ast,
         Err(_) => return Ok(()), // Can't parse - skip type checking
     };
@@ -456,47 +456,49 @@ fn check_ast_types(
     expr: &cel_parser::Expression,
     var_types: &HashMap<String, crate::spec::VarType>,
 ) -> Result<(), String> {
-    use cel_parser::Expression as E;
+    use cel_parser::ast::operators;
+    use cel_parser::ast::Expr as E;
 
-    match expr {
+    match &expr.expr {
         E::Ident(id) => {
             // Check if variable exists and has valid type
-            if let Some(_var_type) = var_types.get(id.as_ref()) {
+            if let Some(_var_type) = var_types.get(id.as_str()) {
                 Ok(())
             } else {
                 Err(format!("Unknown variable: {}", id))
             }
         }
-        E::Relation(left, op, right) => {
-            // Check comparison operations
-            use cel_parser::RelationOp;
-            match op {
-                RelationOp::GreaterThan
-                | RelationOp::LessThan
-                | RelationOp::GreaterThanEq
-                | RelationOp::LessThanEq => {
-                    // Both sides should be comparable types
-                    check_comparable_types(left, right, var_types)?;
+        E::Call(call) => {
+            // Check if this is a relation operator
+            if call.func_name == operators::EQUALS || call.func_name == operators::NOT_EQUALS {
+                if call.args.len() == 2 {
+                    check_same_types(&call.args[0], &call.args[1], var_types)?;
                 }
-                RelationOp::Equals | RelationOp::NotEquals => {
-                    // Both sides should be same type
-                    check_same_types(left, right, var_types)?;
+            } else if call.func_name == operators::GREATER
+                || call.func_name == operators::LESS
+                || call.func_name == operators::GREATER_EQUALS
+                || call.func_name == operators::LESS_EQUALS
+            {
+                if call.args.len() == 2 {
+                    check_comparable_types(&call.args[0], &call.args[1], var_types)?;
                 }
-                _ => {}
+            } else if call.func_name == operators::LOGICAL_AND {
+                if call.args.len() == 2 {
+                    check_ast_types(&call.args[0], var_types)?;
+                    check_ast_types(&call.args[1], var_types)?;
+                }
+            } else if call.func_name == operators::LOGICAL_OR {
+                if call.args.len() == 2 {
+                    check_ast_types(&call.args[0], var_types)?;
+                    check_ast_types(&call.args[1], var_types)?;
+                }
+            } else if call.func_name == operators::LOGICAL_NOT {
+                if let Some(operand) = call.args.first() {
+                    check_ast_types(operand, var_types)?;
+                }
             }
             Ok(())
         }
-        E::And(left, right) => {
-            check_ast_types(left, var_types)?;
-            check_ast_types(right, var_types)?;
-            Ok(())
-        }
-        E::Or(left, right) => {
-            check_ast_types(left, var_types)?;
-            check_ast_types(right, var_types)?;
-            Ok(())
-        }
-        E::Unary(_, operand) => check_ast_types(operand, var_types),
         _ => Ok(()),
     }
 }
@@ -551,15 +553,16 @@ fn infer_type(
     expr: &cel_parser::Expression,
     var_types: &HashMap<String, crate::spec::VarType>,
 ) -> Option<crate::spec::VarType> {
-    use cel_parser::{Atom, Expression as E};
+    use cel_parser::ast::Expr as E;
+    use cel_parser::reference::Val;
 
-    match expr {
-        E::Ident(id) => var_types.get(id.as_ref()).cloned(),
-        E::Atom(atom) => match atom {
-            Atom::Int(_) => Some(crate::spec::VarType::Int),
-            Atom::Float(_) => Some(crate::spec::VarType::Float),
-            Atom::String(_) => Some(crate::spec::VarType::String),
-            Atom::Bool(_b) => Some(crate::spec::VarType::Bool),
+    match &expr.expr {
+        E::Ident(id) => var_types.get(id.as_str()).cloned(),
+        E::Literal(val) => match val {
+            Val::Int(_) | Val::UInt(_) => Some(crate::spec::VarType::Int),
+            Val::Double(_) => Some(crate::spec::VarType::Float),
+            Val::String(_) => Some(crate::spec::VarType::String),
+            Val::Boolean(_) => Some(crate::spec::VarType::Bool),
             _ => None,
         },
         _ => None,

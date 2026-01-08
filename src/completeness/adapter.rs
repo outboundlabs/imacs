@@ -7,6 +7,12 @@
 use super::espresso::{Cover, Cube, CubeValue};
 use super::predicates::{Predicate, PredicateSet};
 use crate::spec::Rule;
+use cel_parser::{
+    ast::operators,
+    ast::{CallExpr, Expr},
+    reference::Val,
+    Parser,
+};
 
 /// Convert a set of rules with predicates into an Espresso Cover
 ///
@@ -40,7 +46,7 @@ pub fn expression_to_cube(expr: &str, predicate_set: &PredicateSet) -> Result<Cu
     cube.set_output(0, CubeValue::One);
 
     // Parse the expression and set cube values
-    if let Ok(ast) = cel_parser::parse(expr) {
+    if let Ok(ast) = Parser::new().parse(expr) {
         set_cube_from_ast(&ast, &mut cube, predicate_set, false);
     }
 
@@ -54,10 +60,9 @@ fn set_cube_from_ast(
     predicate_set: &PredicateSet,
     negated: bool,
 ) {
-    use cel_parser::Expression as E;
-
-    match expr {
-        E::Ident(name) => {
+    // In cel-parser 0.10, Expression is IdedExpr with expr field
+    match &expr.expr {
+        Expr::Ident(name) => {
             let name_str = name.to_string();
             // Find this predicate in our set
             let pred = Predicate::BoolVar(name_str.clone());
@@ -73,107 +78,164 @@ fn set_cube_from_ast(
             }
         }
 
-        E::And(left, right) => {
-            set_cube_from_ast(left, cube, predicate_set, negated);
-            set_cube_from_ast(right, cube, predicate_set, negated);
-        }
-
-        E::Unary(cel_parser::UnaryOp::Not, inner) => {
-            set_cube_from_ast(inner, cube, predicate_set, !negated);
-        }
-
-        E::Relation(left, op, right) => {
-            // Build predicate from relation and find its index
-            if let Some(pred) = relation_to_predicate(left, op, right) {
-                if let Some(idx) = predicate_set.index_of(&pred) {
-                    cube.set_input(
-                        idx,
-                        if negated {
-                            CubeValue::Zero
+        Expr::Call(call) => {
+            // Check if this is a logical AND
+            if call.func_name == operators::LOGICAL_AND {
+                if call.args.len() == 2 {
+                    set_cube_from_ast(&call.args[0], cube, predicate_set, negated);
+                    set_cube_from_ast(&call.args[1], cube, predicate_set, negated);
+                }
+            } else if call.func_name == operators::LOGICAL_OR {
+                // For OR expressions, we can't represent them in a single cube
+                // They need multiple cubes (handled at higher level)
+                // Skip - OR requires multiple cubes
+            } else if call.func_name == operators::LOGICAL_NOT {
+                // NOT operator
+                if let Some(inner) = call.args.first() {
+                    set_cube_from_ast(inner, cube, predicate_set, !negated);
+                }
+            } else if is_relation_op(&call.func_name) {
+                // Relation operator (==, !=, <, >, <=, >=)
+                if call.args.len() == 2 {
+                    if let Some(pred) = relation_to_predicate_from_call(call) {
+                        if let Some(idx) = predicate_set.index_of(&pred) {
+                            cube.set_input(
+                                idx,
+                                if negated {
+                                    CubeValue::Zero
+                                } else {
+                                    CubeValue::One
+                                },
+                            );
                         } else {
-                            CubeValue::One
-                        },
-                    );
-                } else {
-                    // Try negated form
-                    let neg_pred = pred.negated();
-                    if let Some(idx) = predicate_set.index_of(&neg_pred) {
-                        cube.set_input(
-                            idx,
-                            if negated {
-                                CubeValue::One
-                            } else {
-                                CubeValue::Zero
-                            },
-                        );
+                            // Try negated form
+                            let neg_pred = pred.negated();
+                            if let Some(idx) = predicate_set.index_of(&neg_pred) {
+                                cube.set_input(
+                                    idx,
+                                    if negated {
+                                        CubeValue::One
+                                    } else {
+                                        CubeValue::Zero
+                                    },
+                                );
+                            }
+                        }
                     }
                 }
             }
-        }
-
-        // For OR expressions, we can't represent them in a single cube
-        // They need multiple cubes (handled at higher level)
-        E::Or(_, _) => {
-            // Skip - OR requires multiple cubes
         }
 
         _ => {}
     }
 }
 
-/// Convert a relation expression to a Predicate
-fn relation_to_predicate(
-    left: &cel_parser::Expression,
-    op: &cel_parser::RelationOp,
-    right: &cel_parser::Expression,
-) -> Option<Predicate> {
-    use super::predicates::{ComparisonOp, LiteralValue};
-    use cel_parser::Expression as E;
-    use cel_parser::RelationOp;
+/// Check if a function name is a relation operator
+fn is_relation_op(func_name: &str) -> bool {
+    func_name == operators::EQUALS
+        || func_name == operators::NOT_EQUALS
+        || func_name == operators::GREATER
+        || func_name == operators::LESS
+        || func_name == operators::GREATER_EQUALS
+        || func_name == operators::LESS_EQUALS
+}
 
-    let var = match left {
-        E::Ident(name) => name.to_string(),
+/// Convert a relation Call expression to a Predicate
+fn relation_to_predicate_from_call(call: &CallExpr) -> Option<Predicate> {
+    use super::predicates::{ComparisonOp, LiteralValue};
+
+    if call.args.len() != 2 {
+        return None;
+    }
+
+    let left = &call.args[0];
+    let right = &call.args[1];
+
+    // Get variable name from left side
+    let var = match &left.expr {
+        Expr::Ident(name) => name.to_string(),
         _ => return None,
     };
 
-    match (op, right) {
-        (RelationOp::GreaterThan, E::Atom(cel_parser::Atom::Int(i))) => {
-            Some(Predicate::Comparison {
-                var,
-                op: ComparisonOp::Gt,
-                value: LiteralValue::Int(*i),
-            })
+    // Extract literal value from right side
+    let value = match &right.expr {
+        Expr::Literal(val) => match val {
+            Val::Int(i) => LiteralValue::Int(*i),
+            Val::UInt(u) => LiteralValue::Int(*u as i64),
+            Val::Double(f) => LiteralValue::Float(*f),
+            Val::String(s) => LiteralValue::String(s.to_string()),
+            Val::Boolean(b) => LiteralValue::Bool(*b),
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    match call.func_name.as_str() {
+        operators::GREATER => {
+            if let LiteralValue::Int(i) = value {
+                Some(Predicate::Comparison {
+                    var,
+                    op: ComparisonOp::Gt,
+                    value: LiteralValue::Int(i),
+                })
+            } else {
+                None
+            }
         }
-        (RelationOp::GreaterThanEq, E::Atom(cel_parser::Atom::Int(i))) => {
-            Some(Predicate::Comparison {
-                var,
-                op: ComparisonOp::Ge,
-                value: LiteralValue::Int(*i),
-            })
+        operators::GREATER_EQUALS => {
+            if let LiteralValue::Int(i) = value {
+                Some(Predicate::Comparison {
+                    var,
+                    op: ComparisonOp::Ge,
+                    value: LiteralValue::Int(i),
+                })
+            } else {
+                None
+            }
         }
-        (RelationOp::LessThan, E::Atom(cel_parser::Atom::Int(i))) => Some(Predicate::Comparison {
-            var,
-            op: ComparisonOp::Lt,
-            value: LiteralValue::Int(*i),
-        }),
-        (RelationOp::LessThanEq, E::Atom(cel_parser::Atom::Int(i))) => {
-            Some(Predicate::Comparison {
-                var,
-                op: ComparisonOp::Le,
-                value: LiteralValue::Int(*i),
-            })
+        operators::LESS => {
+            if let LiteralValue::Int(i) = value {
+                Some(Predicate::Comparison {
+                    var,
+                    op: ComparisonOp::Lt,
+                    value: LiteralValue::Int(i),
+                })
+            } else {
+                None
+            }
         }
-        (RelationOp::Equals, E::Atom(cel_parser::Atom::String(s))) => Some(Predicate::Equality {
-            var,
-            value: LiteralValue::String(s.to_string()),
-            negated: false,
-        }),
-        (RelationOp::NotEquals, E::Atom(cel_parser::Atom::String(s))) => {
-            Some(Predicate::Equality {
-                var,
-                value: LiteralValue::String(s.to_string()),
-                negated: true,
-            })
+        operators::LESS_EQUALS => {
+            if let LiteralValue::Int(i) = value {
+                Some(Predicate::Comparison {
+                    var,
+                    op: ComparisonOp::Le,
+                    value: LiteralValue::Int(i),
+                })
+            } else {
+                None
+            }
+        }
+        operators::EQUALS => {
+            if let LiteralValue::String(s) = value {
+                Some(Predicate::Equality {
+                    var,
+                    value: LiteralValue::String(s),
+                    negated: false,
+                })
+            } else {
+                None
+            }
+        }
+        operators::NOT_EQUALS => {
+            if let LiteralValue::String(s) = value {
+                Some(Predicate::Equality {
+                    var,
+                    value: LiteralValue::String(s),
+                    negated: true,
+                })
+            } else {
+                None
+            }
         }
         _ => None,
     }

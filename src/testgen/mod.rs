@@ -203,20 +203,22 @@ fn extract_values_from_cel_ast(
     expr: &crate::cel::CelExpr,
     values: &mut std::collections::HashMap<String, String>,
 ) {
-    use crate::cel::CelExpr;
-    use cel_parser::{RelationOp, UnaryOp};
+    use cel_parser::ast::{operators, Expr};
 
-    match expr {
+    // In cel-parser 0.10, Expression is IdedExpr with expr field
+    match &expr.expr {
         // Handle: var == 'value' or 'value' == var
-        CelExpr::Relation(left, RelationOp::Equals, right) => {
+        Expr::Call(call) if call.func_name == operators::EQUALS && call.args.len() == 2 => {
+            let left = &call.args[0];
+            let right = &call.args[1];
             // Check left=ident, right=literal
-            if let CelExpr::Ident(var) = left.as_ref() {
+            if let Expr::Ident(var) = &left.expr {
                 if let Some(val) = extract_literal_value(right) {
                     values.insert(var.to_string(), val);
                 }
             }
             // Check right=ident, left=literal
-            if let CelExpr::Ident(var) = right.as_ref() {
+            if let Expr::Ident(var) = &right.expr {
                 if let Some(val) = extract_literal_value(left) {
                     values.insert(var.to_string(), val);
                 }
@@ -224,21 +226,25 @@ fn extract_values_from_cel_ast(
         }
 
         // Handle: !var (negation means false)
-        CelExpr::Unary(UnaryOp::Not, inner) => {
-            if let CelExpr::Ident(var) = inner.as_ref() {
-                let var_str = var.to_string();
-                if var_str != "true" && var_str != "false" && var_str != "null" {
-                    values.insert(var_str, "false".into());
+        Expr::Call(call) if call.func_name == operators::LOGICAL_NOT => {
+            if let Some(inner) = call.args.first() {
+                if let Expr::Ident(var) = &inner.expr {
+                    let var_str = var.to_string();
+                    if var_str != "true" && var_str != "false" && var_str != "null" {
+                        values.insert(var_str, "false".into());
+                    }
                 }
+                // Recurse into inner expression
+                extract_values_from_cel_ast(inner, values);
             }
-            // Recurse into inner expression
-            extract_values_from_cel_ast(inner, values);
         }
 
         // Handle: condition && condition
-        CelExpr::And(left, right) => {
+        Expr::Call(call) if call.func_name == operators::LOGICAL_AND && call.args.len() == 2 => {
+            let left = &call.args[0];
+            let right = &call.args[1];
             // Check for standalone identifiers (means true)
-            if let CelExpr::Ident(var) = left.as_ref() {
+            if let Expr::Ident(var) = &left.expr {
                 let var_str = var.to_string();
                 if var_str != "true"
                     && var_str != "false"
@@ -248,7 +254,7 @@ fn extract_values_from_cel_ast(
                     values.insert(var_str, "true".into());
                 }
             }
-            if let CelExpr::Ident(var) = right.as_ref() {
+            if let Expr::Ident(var) = &right.expr {
                 let var_str = var.to_string();
                 if var_str != "true"
                     && var_str != "false"
@@ -263,13 +269,13 @@ fn extract_values_from_cel_ast(
         }
 
         // Handle: condition || condition
-        CelExpr::Or(left, right) => {
-            extract_values_from_cel_ast(left, values);
-            extract_values_from_cel_ast(right, values);
+        Expr::Call(call) if call.func_name == operators::LOGICAL_OR && call.args.len() == 2 => {
+            extract_values_from_cel_ast(&call.args[0], values);
+            extract_values_from_cel_ast(&call.args[1], values);
         }
 
         // Standalone identifier (means truthy/true for boolean context)
-        CelExpr::Ident(var) => {
+        Expr::Ident(var) => {
             let var_str = var.to_string();
             if var_str != "true"
                 && var_str != "false"
@@ -281,27 +287,24 @@ fn extract_values_from_cel_ast(
         }
 
         // Recurse into other expression types
-        CelExpr::Ternary(cond, _, _) => {
-            extract_values_from_cel_ast(cond, values);
-        }
-
+        // Note: Ternary expressions may be represented as Call expressions in the new API
         _ => {}
     }
 }
 
 /// Extract a literal value from CEL AST as a string
 fn extract_literal_value(expr: &crate::cel::CelExpr) -> Option<String> {
-    use crate::cel::CelExpr;
-    use cel_parser::Atom;
+    use cel_parser::reference::Val;
 
-    match expr {
-        CelExpr::Atom(atom) => match atom {
-            Atom::String(s) => Some(format!("\"{}\"", s)),
-            Atom::Int(i) => Some(i.to_string()),
-            Atom::UInt(u) => Some(u.to_string()),
-            Atom::Float(f) => Some(f.to_string()),
-            Atom::Bool(b) => Some(b.to_string()),
-            Atom::Null => Some("null".into()),
+    // In cel-parser 0.10, Expression is IdedExpr with expr field
+    match &expr.expr {
+        cel_parser::ast::Expr::Literal(val) => match val {
+            Val::String(s) => Some(format!("\"{}\"", s)),
+            Val::Int(i) => Some(i.to_string()),
+            Val::UInt(u) => Some(u.to_string()),
+            Val::Double(f) => Some(f.to_string()),
+            Val::Boolean(b) => Some(b.to_string()),
+            Val::Null => Some("null".into()),
             _ => None,
         },
         _ => None,

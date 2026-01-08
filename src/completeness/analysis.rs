@@ -10,6 +10,9 @@
 use super::predicates::{extract_predicates, Predicate, PredicateSet};
 use crate::cel::CelCompiler;
 use crate::spec::Spec;
+use cel_parser::ast::operators;
+use cel_parser::ast::Expr;
+use cel_parser::reference::Val;
 use quine_mc_cluskey::Bool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -254,10 +257,9 @@ fn expression_matches(
     combo: u64,
     predicate_set: &PredicateSet,
 ) -> bool {
-    use cel_parser::Expression as E;
-
-    match expr {
-        E::Ident(name) => {
+    // In cel-parser 0.10, Expression is IdedExpr with expr field
+    match &expr.expr {
+        Expr::Ident(name) => {
             let name_str = name.to_string();
             // Check if this identifier is a predicate
             for (idx, pred) in predicate_set.predicates.iter().enumerate() {
@@ -272,94 +274,98 @@ fn expression_matches(
             true
         }
 
-        E::And(left, right) => {
-            expression_matches(left, combo, predicate_set)
-                && expression_matches(right, combo, predicate_set)
-        }
-
-        E::Or(left, right) => {
-            expression_matches(left, combo, predicate_set)
-                || expression_matches(right, combo, predicate_set)
-        }
-
-        E::Unary(cel_parser::UnaryOp::Not, inner) => {
-            !expression_matches(inner, combo, predicate_set)
-        }
-
-        E::Relation(left, op, right) => {
-            // Try to match against our predicates
-            // Get variable name from left side
-            let var = match left.as_ref() {
-                E::Ident(name) => name.to_string(),
-                _ => return true, // Unknown - assume true
-            };
-
-            // Build a predicate and check if it's in our set
-            use super::predicates::{ComparisonOp, LiteralValue};
-            use cel_parser::RelationOp;
-
-            let pred = match (op, right.as_ref()) {
-                (RelationOp::GreaterThan, E::Atom(cel_parser::Atom::Int(i))) => {
-                    Some(Predicate::Comparison {
-                        var: var.clone(),
-                        op: ComparisonOp::Gt,
-                        value: LiteralValue::Int(*i),
-                    })
+        Expr::Call(call) => {
+            // Handle logical operators
+            if call.func_name == operators::LOGICAL_AND {
+                if call.args.len() == 2 {
+                    return expression_matches(&call.args[0], combo, predicate_set)
+                        && expression_matches(&call.args[1], combo, predicate_set);
                 }
-                (RelationOp::GreaterThanEq, E::Atom(cel_parser::Atom::Int(i))) => {
-                    Some(Predicate::Comparison {
-                        var: var.clone(),
-                        op: ComparisonOp::Ge,
-                        value: LiteralValue::Int(*i),
-                    })
+            } else if call.func_name == operators::LOGICAL_OR {
+                if call.args.len() == 2 {
+                    return expression_matches(&call.args[0], combo, predicate_set)
+                        || expression_matches(&call.args[1], combo, predicate_set);
                 }
-                (RelationOp::LessThan, E::Atom(cel_parser::Atom::Int(i))) => {
-                    Some(Predicate::Comparison {
+            } else if call.func_name == operators::LOGICAL_NOT {
+                if let Some(inner) = call.args.first() {
+                    return !expression_matches(inner, combo, predicate_set);
+                }
+            } else if call.args.len() == 2 {
+                // Try to match against our predicates for relation operators
+                let left = &call.args[0];
+                let right = &call.args[1];
+
+                // Get variable name from left side
+                let var = match &left.expr {
+                    Expr::Ident(name) => name.to_string(),
+                    _ => return true, // Unknown - assume true
+                };
+
+                // Build a predicate and check if it's in our set
+                use super::predicates::{ComparisonOp, LiteralValue};
+                use cel_parser::reference::Val;
+
+                let pred = match (call.func_name.as_str(), &right.expr) {
+                    (operators::GREATER, Expr::Literal(Val::Int(i))) => {
+                        Some(Predicate::Comparison {
+                            var: var.clone(),
+                            op: ComparisonOp::Gt,
+                            value: LiteralValue::Int(*i),
+                        })
+                    }
+                    (operators::GREATER_EQUALS, Expr::Literal(Val::Int(i))) => {
+                        Some(Predicate::Comparison {
+                            var: var.clone(),
+                            op: ComparisonOp::Ge,
+                            value: LiteralValue::Int(*i),
+                        })
+                    }
+                    (operators::LESS, Expr::Literal(Val::Int(i))) => Some(Predicate::Comparison {
                         var: var.clone(),
                         op: ComparisonOp::Lt,
                         value: LiteralValue::Int(*i),
-                    })
-                }
-                (RelationOp::LessThanEq, E::Atom(cel_parser::Atom::Int(i))) => {
-                    Some(Predicate::Comparison {
-                        var: var.clone(),
-                        op: ComparisonOp::Le,
-                        value: LiteralValue::Int(*i),
-                    })
-                }
-                (RelationOp::Equals, E::Atom(cel_parser::Atom::String(s))) => {
-                    Some(Predicate::Equality {
-                        var: var.clone(),
-                        value: LiteralValue::String(s.to_string()),
-                        negated: false,
-                    })
-                }
-                (RelationOp::NotEquals, E::Atom(cel_parser::Atom::String(s))) => {
-                    Some(Predicate::Equality {
-                        var: var.clone(),
-                        value: LiteralValue::String(s.to_string()),
-                        negated: true,
-                    })
-                }
-                _ => None,
-            };
+                    }),
+                    (operators::LESS_EQUALS, Expr::Literal(Val::Int(i))) => {
+                        Some(Predicate::Comparison {
+                            var: var.clone(),
+                            op: ComparisonOp::Le,
+                            value: LiteralValue::Int(*i),
+                        })
+                    }
+                    (operators::EQUALS, Expr::Literal(Val::String(s))) => {
+                        Some(Predicate::Equality {
+                            var: var.clone(),
+                            value: LiteralValue::String(s.to_string()),
+                            negated: false,
+                        })
+                    }
+                    (operators::NOT_EQUALS, Expr::Literal(Val::String(s))) => {
+                        Some(Predicate::Equality {
+                            var: var.clone(),
+                            value: LiteralValue::String(s.to_string()),
+                            negated: true,
+                        })
+                    }
+                    _ => None,
+                };
 
-            if let Some(pred) = pred {
-                if let Some(idx) = predicate_set.index_of(&pred) {
-                    return (combo >> idx) & 1 == 1;
-                }
-                // Check negated form
-                let negated_pred = pred.negated();
-                if let Some(idx) = predicate_set.index_of(&negated_pred) {
-                    return (combo >> idx) & 1 == 0;
+                if let Some(pred) = pred {
+                    if let Some(idx) = predicate_set.index_of(&pred) {
+                        return (combo >> idx) & 1 == 1;
+                    }
+                    // Check negated form
+                    let negated_pred = pred.negated();
+                    if let Some(idx) = predicate_set.index_of(&negated_pred) {
+                        return (combo >> idx) & 1 == 0;
+                    }
                 }
             }
-            // Unknown relation - assume true (conservative)
+            // Unknown call - assume true (conservative)
             true
         }
 
-        E::Atom(cel_parser::Atom::Bool(b)) => *b,
-        E::Atom(_) => true, // Non-boolean atoms assumed true in boolean context
+        Expr::Literal(Val::Boolean(b)) => *b,
+        Expr::Literal(_) => true, // Non-boolean literals assumed true in boolean context
 
         // For other expressions, assume they match (conservative)
         _ => true,
@@ -531,10 +537,12 @@ fn collect_indices_from_ast(
     predicate_set: &PredicateSet,
     indices: &mut Vec<usize>,
 ) {
-    use cel_parser::Expression as E;
+    use cel_parser::ast::operators;
+    use cel_parser::ast::Expr;
 
-    match expr {
-        E::Ident(name) => {
+    // In cel-parser 0.10, Expression is IdedExpr with expr field
+    match &expr.expr {
+        Expr::Ident(name) => {
             let name_str = name.to_string();
             for (idx, pred) in predicate_set.predicates.iter().enumerate() {
                 if let Predicate::BoolVar(var_name) = pred {
@@ -545,26 +553,42 @@ fn collect_indices_from_ast(
                 }
             }
         }
-        E::And(left, right) | E::Or(left, right) => {
-            collect_indices_from_ast(left, predicate_set, indices);
-            collect_indices_from_ast(right, predicate_set, indices);
-        }
-        E::Unary(_, inner) => {
-            collect_indices_from_ast(inner, predicate_set, indices);
-        }
-        E::Relation(_, _, _) => {
-            // Try to find this relation as a predicate
-            let cel_str = format!("{:?}", expr);
-            if let Ok(preds) = extract_predicates(&cel_str) {
-                if let Some(pred) = preds.into_iter().next() {
-                    if let Some(idx) = predicate_set.index_of(&pred) {
-                        indices.push(idx);
+        Expr::Call(call) => {
+            if call.func_name == operators::LOGICAL_AND || call.func_name == operators::LOGICAL_OR {
+                if call.args.len() == 2 {
+                    collect_indices_from_ast(&call.args[0], predicate_set, indices);
+                    collect_indices_from_ast(&call.args[1], predicate_set, indices);
+                }
+            } else if call.func_name == operators::LOGICAL_NOT {
+                if let Some(inner) = call.args.first() {
+                    collect_indices_from_ast(inner, predicate_set, indices);
+                }
+            } else if is_relation_op(&call.func_name) {
+                // Try to find this relation as a predicate
+                let cel_str = format!("{:?}", expr);
+                if let Ok(preds) = extract_predicates(&cel_str) {
+                    if let Some(pred) = preds.into_iter().next() {
+                        if let Some(idx) = predicate_set.index_of(&pred) {
+                            indices.push(idx);
+                        }
                     }
                 }
             }
         }
         _ => {}
     }
+}
+
+/// Check if a function name is a relation operator
+fn is_relation_op(func_name: &str) -> bool {
+    use cel_parser::ast::operators;
+    func_name == operators::EQUALS
+        || func_name == operators::NOT_EQUALS
+        || func_name == operators::GREATER
+        || func_name == operators::LESS
+        || func_name == operators::GREATER_EQUALS
+        || func_name == operators::LESS_EQUALS
+        || func_name == operators::IN
 }
 
 /// Convert CEL expression to quine-mc_cluskey Bool with index mapping
@@ -583,10 +607,13 @@ fn ast_to_bool_mapped(
     predicate_set: &PredicateSet,
     index_map: &HashMap<usize, u8>,
 ) -> Option<Bool> {
-    use cel_parser::Expression as E;
+    use cel_parser::ast::operators;
+    use cel_parser::ast::Expr;
+    use cel_parser::reference::Val;
 
-    match expr {
-        E::Ident(name) => {
+    // In cel-parser 0.10, Expression is IdedExpr with expr field
+    match &expr.expr {
+        Expr::Ident(name) => {
             let name_str = name.to_string();
             // Find this identifier in predicates
             for (idx, pred) in predicate_set.predicates.iter().enumerate() {
@@ -616,41 +643,43 @@ fn ast_to_bool_mapped(
             Some(Bool::True) // Unknown - assume true
         }
 
-        E::And(left, right) => {
-            let l = ast_to_bool_mapped(left, predicate_set, index_map)?;
-            let r = ast_to_bool_mapped(right, predicate_set, index_map)?;
-            Some(Bool::And(vec![l, r]))
-        }
-
-        E::Or(left, right) => {
-            let l = ast_to_bool_mapped(left, predicate_set, index_map)?;
-            let r = ast_to_bool_mapped(right, predicate_set, index_map)?;
-            Some(Bool::Or(vec![l, r]))
-        }
-
-        E::Unary(cel_parser::UnaryOp::Not, inner) => {
-            let i = ast_to_bool_mapped(inner, predicate_set, index_map)?;
-            Some(Bool::Not(Box::new(i)))
-        }
-
-        E::Relation(_, _, _) => {
-            // Find this relation as a predicate
-            let cel_str = format!("{:?}", expr);
-            if let Ok(preds) = extract_predicates(&cel_str) {
-                if let Some(pred) = preds.into_iter().next() {
-                    if let Some(idx) = predicate_set.index_of(&pred) {
-                        if let Some(&mapped_idx) = index_map.get(&idx) {
-                            return Some(Bool::Term(mapped_idx));
+        Expr::Call(call) => {
+            if call.func_name == operators::LOGICAL_AND && call.args.len() == 2 {
+                let l = ast_to_bool_mapped(&call.args[0], predicate_set, index_map)?;
+                let r = ast_to_bool_mapped(&call.args[1], predicate_set, index_map)?;
+                Some(Bool::And(vec![l, r]))
+            } else if call.func_name == operators::LOGICAL_OR && call.args.len() == 2 {
+                let l = ast_to_bool_mapped(&call.args[0], predicate_set, index_map)?;
+                let r = ast_to_bool_mapped(&call.args[1], predicate_set, index_map)?;
+                Some(Bool::Or(vec![l, r]))
+            } else if call.func_name == operators::LOGICAL_NOT {
+                if let Some(inner) = call.args.first() {
+                    let i = ast_to_bool_mapped(inner, predicate_set, index_map)?;
+                    Some(Bool::Not(Box::new(i)))
+                } else {
+                    Some(Bool::True)
+                }
+            } else if is_relation_op(&call.func_name) {
+                // Find this relation as a predicate
+                let cel_str = format!("{:?}", expr);
+                if let Ok(preds) = extract_predicates(&cel_str) {
+                    if let Some(pred) = preds.into_iter().next() {
+                        if let Some(idx) = predicate_set.index_of(&pred) {
+                            if let Some(&mapped_idx) = index_map.get(&idx) {
+                                return Some(Bool::Term(mapped_idx));
+                            }
                         }
                     }
                 }
+                Some(Bool::True)
+            } else {
+                Some(Bool::True)
             }
-            Some(Bool::True)
         }
 
-        E::Atom(atom) => match atom {
-            cel_parser::Atom::Bool(true) => Some(Bool::True),
-            cel_parser::Atom::Bool(false) => Some(Bool::False),
+        Expr::Literal(val) => match val {
+            Val::Boolean(true) => Some(Bool::True),
+            Val::Boolean(false) => Some(Bool::False),
             _ => Some(Bool::True),
         },
 
