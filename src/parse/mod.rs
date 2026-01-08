@@ -45,16 +45,6 @@ impl ParseContext {
         });
     }
 
-    #[allow(dead_code)]
-    fn record_syntax_error(&mut self, message: &str, span: Span) {
-        let source_text = self.extract_source_text(span);
-        self.diagnostics.syntax_errors.push(SyntaxErrorInfo {
-            message: message.to_string(),
-            span,
-            source_text,
-        });
-    }
-
     fn extract_source_text(&self, span: Span) -> String {
         let lines: Vec<&str> = self.source.lines().collect();
         if span.start_line > 0 && span.start_line <= lines.len() {

@@ -415,25 +415,7 @@ pub fn extract(code: &CodeAst) -> ExtractedSpec {
 }
 
 /// Spec extractor
-pub struct Extractor {
-    #[allow(dead_code)]
-    config: ExtractorConfig,
-}
-
-/// Extractor configuration
-#[derive(Debug, Clone)]
-pub struct ExtractorConfig {
-    /// Minimum confidence to include a rule
-    pub min_confidence: f32,
-}
-
-impl Default for ExtractorConfig {
-    fn default() -> Self {
-        Self {
-            min_confidence: 0.5,
-        }
-    }
-}
+pub struct Extractor;
 
 /// Result of extraction
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -567,13 +549,7 @@ impl ExtractionContext {
 
 impl Extractor {
     pub fn new() -> Self {
-        Self {
-            config: ExtractorConfig::default(),
-        }
-    }
-
-    pub fn with_config(config: ExtractorConfig) -> Self {
-        Self { config }
+        Self
     }
 
     /// Extract spec from code with detailed extraction report
@@ -981,7 +957,7 @@ impl Extractor {
                 // Try to extract "exists" pattern from for-each loops with early returns
                 // Pattern: for item in collection { if cond { return val } } return default
                 if let Some((condition_cel, return_value)) =
-                    self.find_early_return_pattern(body, item, ctx)
+                    self.find_early_return_pattern(body, ctx)
                 {
                     ctx.record_decision_point(true);
                     if let Ok(collection_cel) = ast_to_cel_with_ctx(collection, ctx) {
@@ -1438,7 +1414,6 @@ impl Extractor {
     fn find_early_return_pattern(
         &self,
         body: &AstNode,
-        item_var: &str,
         ctx: &ExtractionContext,
     ) -> Option<(String, ConditionValue)> {
         match body {
@@ -1461,7 +1436,7 @@ impl Extractor {
             // Block with statements - look for if inside
             AstNode::Block { statements, .. } => {
                 for stmt in statements {
-                    if let Some(result) = self.find_early_return_pattern(stmt, item_var, ctx) {
+                    if let Some(result) = self.find_early_return_pattern(stmt, ctx) {
                         return Some(result);
                     }
                 }
@@ -2213,7 +2188,7 @@ fn check(a: i32, b: i32) -> bool {
             span: span(),
         };
 
-        let result = extractor.find_early_return_pattern(&body, "item", &ctx);
+        let result = extractor.find_early_return_pattern(&body, &ctx);
         assert!(result.is_some(), "Should find early return pattern");
 
         let (condition_cel, return_value) = result.unwrap();
@@ -2256,7 +2231,7 @@ fn check(a: i32, b: i32) -> bool {
             span: span(),
         };
 
-        let result = extractor.find_early_return_pattern(&body, "item", &ctx);
+        let result = extractor.find_early_return_pattern(&body, &ctx);
         assert!(result.is_some(), "Should find early return pattern in block");
 
         let (condition_cel, return_value) = result.unwrap();
@@ -2279,7 +2254,7 @@ fn check(a: i32, b: i32) -> bool {
             span: span(),
         };
 
-        let result = extractor.find_early_return_pattern(&body, "item", &ctx);
+        let result = extractor.find_early_return_pattern(&body, &ctx);
         assert!(result.is_none(), "Should not find early return pattern in var");
     }
 

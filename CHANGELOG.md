@@ -70,6 +70,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Orchestrator rendering loads referenced specs from filesystem (was empty HashMap)
 - Removed ~170 lines of dead code from extraction module (old pre-context API)
 
+### Code Quality Cleanup
+
+- **Dead Code Removal**
+  - Removed unused `Extractor::config` field and `ExtractorConfig` struct
+  - Removed unused `record_syntax_error()` method from parse module
+  - Removed unused `item_var` parameter from `find_early_return_pattern()`
+
+- **Stub Implementations Completed**
+  - `derive_input_values_from_predicates()` - generates concrete test values from predicate constraints
+  - `infer_namespace_prefix()` - infers namespace from spec IDs (common prefix, domain extraction)
+
+- **Audit Results**
+  - Most "stubs" identified were actually working implementations with documented limitations
+  - CLI argument parsing uses shared utilities in `util.rs` - no DRY violation
+  - `verify_orchestrate.rs` is not yet integrated (orphaned file) - TODOs there are not active code
+
 ## [0.0.2] - 2026-01-08
 
 ### Changed
