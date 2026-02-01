@@ -42,7 +42,7 @@ regex = "1"
 genco = "0.19"
 
 # Template engine for code generation
-minijinja = { version = "2.14", features = ["loader"] }
+minijinja = { version = "2.15", features = ["loader"] }
 
 # Code formatting
 prettyplease = "0.2"
