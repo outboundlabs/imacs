@@ -159,6 +159,13 @@ impl<'a> TypeScriptRenderer<'a> {
                     .collect();
                 format!("{{ {} }}", fields.join(", "))
             }
+            Output::Expression(expr) => {
+                CelCompiler::compile(expr, Target::TypeScript)
+                    .map(|compiled| {
+                        translate_vars(&compiled, &self.input_names, VarTranslation::CamelCase)
+                    })
+                    .unwrap_or_else(|_| expr.clone())
+            }
         }
     }
 

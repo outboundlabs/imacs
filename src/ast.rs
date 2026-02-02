@@ -3,6 +3,7 @@
 //! Language-agnostic AST that captures decision logic structure.
 //! Parsed from source code via tree-sitter.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Parsed code AST
@@ -29,6 +30,64 @@ pub enum Language {
     CSharp,
     Java,
     Unknown,
+}
+
+/// Result of parsing with diagnostics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParseResult {
+    /// The parsed AST
+    pub ast: CodeAst,
+    /// Diagnostics collected during parsing
+    pub diagnostics: ParseDiagnostics,
+}
+
+/// Diagnostics collected during parsing
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ParseDiagnostics {
+    /// Nodes that couldn't be parsed into known types
+    pub unknown_nodes: Vec<UnknownNodeInfo>,
+    /// Syntax errors detected by tree-sitter
+    pub syntax_errors: Vec<SyntaxErrorInfo>,
+}
+
+impl ParseDiagnostics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn has_issues(&self) -> bool {
+        !self.unknown_nodes.is_empty() || !self.syntax_errors.is_empty()
+    }
+
+    pub fn unknown_count(&self) -> usize {
+        self.unknown_nodes.len()
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.syntax_errors.len()
+    }
+}
+
+/// Information about an unknown/unparsed node
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnknownNodeInfo {
+    /// The tree-sitter node kind (e.g., "macro_invocation", "type_cast_expression")
+    pub kind: String,
+    /// Source location
+    pub span: Span,
+    /// The source text that couldn't be parsed
+    pub source_text: String,
+}
+
+/// Information about a syntax error
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyntaxErrorInfo {
+    /// Error message
+    pub message: String,
+    /// Source location
+    pub span: Span,
+    /// The source text with the error
+    pub source_text: String,
 }
 
 /// A function definition
@@ -58,7 +117,7 @@ pub struct Parameter {
 }
 
 /// Source location
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema)]
 pub struct Span {
     pub start_line: usize,
     pub start_col: usize,
@@ -203,6 +262,34 @@ pub enum AstNode {
         span: Span,
     },
 
+    /// Macro call (e.g., println!(...))
+    MacroCall {
+        name: String,
+        args: String, // Raw arguments as string (macros have arbitrary syntax)
+        span: Span,
+    },
+
+    /// Reference expression (e.g., &x, &mut x)
+    Ref {
+        mutable: bool,
+        expr: Box<AstNode>,
+        span: Span,
+    },
+
+    /// Type cast expression (e.g., x as i32)
+    Cast {
+        expr: Box<AstNode>,
+        target_type: String,
+        span: Span,
+    },
+
+    /// Syntax error from parser
+    SyntaxError {
+        message: String,
+        source_text: String,
+        span: Span,
+    },
+
     /// Unknown/unparsed node
     Unknown { kind: String, span: Span },
 }
@@ -232,6 +319,10 @@ impl AstNode {
             AstNode::Assign { span, .. } => *span,
             AstNode::Await { span, .. } => *span,
             AstNode::Closure { span, .. } => *span,
+            AstNode::MacroCall { span, .. } => *span,
+            AstNode::Ref { span, .. } => *span,
+            AstNode::Cast { span, .. } => *span,
+            AstNode::SyntaxError { span, .. } => *span,
             AstNode::Unknown { span, .. } => *span,
         }
     }

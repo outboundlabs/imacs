@@ -189,6 +189,12 @@ impl<'a> CSharpRenderer<'a> {
                     .collect();
                 quote!(new { $(fields.join(", ")) })
             }
+            Output::Expression(expr) => {
+                let compiled = CelCompiler::compile(expr, Target::CSharp)
+                    .map(|c| translate_vars(&c, &self.input_names, VarTranslation::CamelCase))
+                    .unwrap_or_else(|_| expr.clone());
+                quote!($compiled)
+            }
         }
     }
 

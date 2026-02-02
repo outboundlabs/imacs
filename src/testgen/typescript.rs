@@ -109,6 +109,7 @@ impl<'a> TsTestGen<'a> {
         match output {
             Output::Single(v) => self.ts_condition_value(v),
             Output::Named(_) => "{}".into(),
+            Output::Expression(expr) => expr.clone(),
         }
     }
 

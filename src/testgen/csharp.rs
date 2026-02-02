@@ -126,6 +126,7 @@ impl<'a> CSharpTestGen<'a> {
         match output {
             Output::Single(v) => self.csharp_condition_value(v),
             Output::Named(_) => "new { }".into(),
+            Output::Expression(expr) => expr.clone(),
         }
     }
 

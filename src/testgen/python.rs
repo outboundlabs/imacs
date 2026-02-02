@@ -135,6 +135,7 @@ impl<'a> PyTestGen<'a> {
         match output {
             Output::Single(v) => self.python_condition_value(v),
             Output::Named(_) => "{}".into(),
+            Output::Expression(expr) => expr.clone(),
         }
     }
 

@@ -206,6 +206,7 @@ impl<'a> RustTestGen<'a> {
             Output::Named(m) => Some(m),
             Output::Single(ConditionValue::Map(m)) => Some(m),
             Output::Single(v) => return self.rust_condition_value(v),
+            Output::Expression(expr) => return expr.clone(),
         };
 
         let map = match map {

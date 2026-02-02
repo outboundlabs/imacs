@@ -205,14 +205,18 @@ pub mod generated;
 // Re-exports
 pub use analyze::{analyze, AnalysisReport, Analyzer, FunctionMetrics, Issue, Severity};
 pub use ast::{
-    AstNode, BinaryOp, CodeAst, Function, LiteralValue, MatchArm, Pattern, Span, UnaryOp,
+    AstNode, BinaryOp, CodeAst, Function, Language, LiteralValue, MatchArm, ParseDiagnostics,
+    ParseResult, Pattern, Span, SyntaxErrorInfo, UnaryOp, UnknownNodeInfo,
 };
 pub use cel::Target;
 pub use cel::{CelCompiler, CelExpr};
 pub use drift::{compare, Difference, DriftDetector, DriftReport, DriftStatus};
 pub use error::{Error, Result};
-pub use extract::{extract, Confidence, ExtractedSpec, Extractor};
-pub use parse::parse_rust;
+pub use extract::{
+    ast_to_cel, extract, extract_with_report, pattern_to_cel, Confidence, ConversionError,
+    ExtractedSpec, ExtractionReport, Extractor, SkippedNode,
+};
+pub use parse::{detect_language, parse_rust, parse_rust_with_diagnostics, to_sexp};
 pub use render::{render, Renderer};
 pub use spec::{Condition, ConditionOp, ConditionValue, Output, Rule, Spec, VarType, Variable};
 pub use testgen::{generate_tests, TestConfig, TestGenerator, TestMode};

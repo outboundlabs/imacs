@@ -164,6 +164,12 @@ impl<'a> GoRenderer<'a> {
                     .collect();
                 quote!(map[string]interface{}{$(fields.join(", "))})
             }
+            Output::Expression(expr) => {
+                let compiled = CelCompiler::compile(expr, Target::Go)
+                    .map(|c| translate_vars(&c, &self.input_names, VarTranslation::InputPascal))
+                    .unwrap_or_else(|_| expr.clone());
+                quote!($compiled)
+            }
         }
     }
 

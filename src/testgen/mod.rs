@@ -438,6 +438,7 @@ fn output_value_str(output: &Output) -> String {
     match output {
         Output::Single(v) => condition_value_str(v),
         Output::Named(_) => "{}".into(),
+        Output::Expression(expr) => expr.clone(),
     }
 }
 

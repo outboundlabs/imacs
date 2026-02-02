@@ -405,11 +405,99 @@ fn build_missing_case(combo: u64, predicate_set: &PredicateSet) -> MissingCase {
         })
         .collect();
 
+    // Derive input values from predicates
+    let input_values = derive_input_values_from_predicates(&predicate_values, predicate_set);
+
     MissingCase {
         predicate_values,
         cel_conditions,
-        input_values: HashMap::new(), // TODO: derive from predicates
+        input_values,
     }
+}
+
+/// Derive concrete input values from predicate values
+///
+/// For each predicate, extracts the variable name and generates a value
+/// that would satisfy the predicate's truth assignment.
+fn derive_input_values_from_predicates(
+    predicate_values: &[PredicateValue],
+    predicate_set: &PredicateSet,
+) -> HashMap<String, String> {
+    use super::predicates::{LiteralValue, Predicate};
+
+    let mut input_values = HashMap::new();
+
+    for pv in predicate_values {
+        if let Some(pred) = predicate_set.get(pv.predicate_id) {
+            match pred {
+                Predicate::BoolVar(name) => {
+                    input_values.insert(name.clone(), pv.value.to_string());
+                }
+                Predicate::Comparison { var, op, value } => {
+                    // Generate a value that satisfies (or doesn't satisfy) the comparison
+                    let satisfying_value = if pv.value {
+                        match (op, value) {
+                            (super::predicates::ComparisonOp::Gt, LiteralValue::Int(n)) => {
+                                (n + 1).to_string()
+                            }
+                            (super::predicates::ComparisonOp::Ge, LiteralValue::Int(n)) => {
+                                n.to_string()
+                            }
+                            (super::predicates::ComparisonOp::Lt, LiteralValue::Int(n)) => {
+                                (n - 1).to_string()
+                            }
+                            (super::predicates::ComparisonOp::Le, LiteralValue::Int(n)) => {
+                                n.to_string()
+                            }
+                            _ => value.to_string(),
+                        }
+                    } else {
+                        // Generate value that does NOT satisfy the comparison
+                        match (op, value) {
+                            (super::predicates::ComparisonOp::Gt, LiteralValue::Int(n)) => {
+                                n.to_string()
+                            }
+                            (super::predicates::ComparisonOp::Ge, LiteralValue::Int(n)) => {
+                                (n - 1).to_string()
+                            }
+                            (super::predicates::ComparisonOp::Lt, LiteralValue::Int(n)) => {
+                                n.to_string()
+                            }
+                            (super::predicates::ComparisonOp::Le, LiteralValue::Int(n)) => {
+                                (n + 1).to_string()
+                            }
+                            _ => value.to_string(),
+                        }
+                    };
+                    input_values.insert(var.clone(), satisfying_value);
+                }
+                Predicate::Equality { var, value, negated } => {
+                    // For equality, if predicate is true XOR negated, use the value
+                    let should_use_value = pv.value != *negated;
+                    if should_use_value {
+                        input_values.insert(var.clone(), value.to_string());
+                    }
+                    // If not using the value, skip (would need domain knowledge for alternative)
+                }
+                Predicate::Membership { var, values, negated } => {
+                    let should_be_member = pv.value != *negated;
+                    if should_be_member && !values.is_empty() {
+                        // Use first value from the set
+                        input_values.insert(var.clone(), values[0].to_string());
+                    }
+                    // If not member, skip (would need domain knowledge for alternative)
+                }
+                Predicate::StringOp { var, arg, .. } => {
+                    // For string ops, just use the arg as a hint
+                    if pv.value {
+                        input_values.insert(var.clone(), format!("\"{}...\"", arg));
+                    }
+                }
+            }
+        }
+    }
+
+    input_values
 }
 
 /// Build a RuleOverlap from a combination and rules

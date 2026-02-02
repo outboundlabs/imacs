@@ -212,6 +212,9 @@ impl<'a> PythonRenderer<'a> {
                     .collect();
                 format!("{{ {} }}", fields.join(", "))
             }
+            Output::Expression(expr) => {
+                CelCompiler::compile(expr, Target::Python).unwrap_or_else(|_| expr.clone())
+            }
         }
     }
 

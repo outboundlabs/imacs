@@ -146,6 +146,12 @@ impl<'a> JavaRenderer<'a> {
                     .collect();
                 quote!(new Object() {{ $(fields.join(", ")) }})
             }
+            Output::Expression(expr) => {
+                let compiled = CelCompiler::compile(expr, Target::Java)
+                    .map(|c| translate_vars(&c, &self.input_names, VarTranslation::InputCamel))
+                    .unwrap_or_else(|_| expr.clone());
+                quote!($compiled)
+            }
         }
     }
 
