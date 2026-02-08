@@ -155,9 +155,9 @@ checksum = "e629a66d692cb9ff1a1c664e41771b3dcaf961985a9774c0eb0bd1b51cf60a48"
 
 [[package]]
 name = "cargo-config2"
-version = "0.1.39"
+version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3795d3a48839a46854805f56c8fe9c558f10804bcf57df53925ca843d87c788f"
+checksum = "9821da7dd887f2a39d24a12415376dfc532200a7f9edbcf6bb97e96120a257e9"
 dependencies = [
  "serde",
  "serde_derive",
@@ -167,9 +167,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-llvm-cov"
-version = "0.6.23"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a19af1cb5512737613b5caa313dd14cd56459732867c53a755da4b967ffefe6"
+checksum = "3df082077af932cde39d8434e1ab147f80bda1f9fc4da64a699b109f897fcd63"
 dependencies = [
  "anyhow",
  "camino",
